@@ -158,10 +158,10 @@ drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'
 $('xauto').addEventListener('click',()=>{st.auto.x=true;render();});$('yauto').addEventListener('click',()=>{st.auto.y=true;render();});
 $('grid').addEventListener('change',e=>{st.grid=e.target.checked;render();});
 $('legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.legend=b.dataset.v;legendButtons();render();}));
-$('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value='';if(!k)return;const n=st.series.length;
- st.series.forEach((s,i)=>{if(k==='office')s.color=OFFICE[i%OFFICE.length];else if(k==='btb'){const m=s.name.match(/pH\s*([0-9]+(?:\.[0-9]+)?)/i)||s.name.match(/([0-9]+(?:\.[0-9]+)?)/);if(m)s.color=btbColor(+m[1]);}
+$('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value='';if(!k)return;const miss=[];const n=st.series.length;
+ st.series.forEach((s,i)=>{if(k==='office')s.color=OFFICE[i%OFFICE.length];else if(k==='btb'){const m=s.name.match(/pH\s*([0-9]+(?:\.[0-9]+)?)/i);if(m)s.color=btbColor(+m[1]);else miss.push(s.name||'（名前なし）');}
   else{const t=n>1?i/(n-1):0;const [c1,c2]=k==='grad'?[[33,64,200],[200,40,40]]:[[0,0,0],[170,170,170]];s.color='#'+c1.map((v,j)=>Math.round(v+(c2[j]-v)*t).toString(16).padStart(2,'0')).join('').toUpperCase();}});
- if(k==='btb'&&!st.series.some(s=>/[0-9]/.test(s.name))){$('msg').className='msg err';$('msg').textContent='BTBの色は、名前に「pH 7.35」のようにpHの数値があるときに使えます。';}
+ if(k==='btb'&&miss.length){$('msg').className='msg err';$('msg').textContent=`名前に pH がないため色を変えなかった線：${miss.join('、')}（名前を「pH 7.35」のようにしてから、もう一度選んでください）`;}else $('msg').textContent='';
  touch();list();render();});
 $('clearall').addEventListener('click',()=>{st.series=[];st.sample=false;$('msg').textContent='';list();render();});
 $('sample').addEventListener('click',()=>{st.series=sample();st.sample=true;setAx({xt:'*λ* / nm',yt:'*A*'});st.auto.x=st.auto.y=true;list();render();});
