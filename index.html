@@ -272,6 +272,10 @@ function mk(o){return {id:++uid,dash:'solid',width:1.5,show:true,...o};}
 
 /* ---------- axis helpers ---------- */
 function niceStep(span,n=6){if(!(span>0))return 1;const raw=span/n,mag=10**Math.floor(Math.log10(raw));return [1,2,2.5,5,10].map(k=>k*mag).find(v=>v>=raw*0.999);}
+// automatic tick spacing: a round step that divides the range exactly, so the last tick (e.g. 700) also gets a label
+function autoMajor(span){if(!(span>0))return 1;const e=Math.floor(Math.log10(span));let best=null;
+ for(const mag of [10**(e-2),10**(e-1),10**e])for(const k of [1,2,2.5,5]){const c=+(k*mag).toPrecision(6),n=span/c;if(Math.abs(n-Math.round(n))<1e-6&&n>=4&&n<=14){const sc=Math.abs(n-6)+(k===2.5?0.5:0);if(!best||sc<best.sc)best={c,sc};}}
+ return best?best.c:niceStep(span);}
 const decOf=v=>{const s=String(+v.toPrecision(8));const i=s.indexOf('.');return i<0?0:s.length-i-1;};
 const fmtTick=(v,maj)=>{const d=Math.min(6,decOf(maj));const t=Math.abs(v)<maj*1e-6?0:v;return (t<0?'−':'')+Math.abs(t).toFixed(d);};
 function visible(){return st.series.filter(s=>s.show&&s.data.length);}
@@ -282,7 +286,7 @@ function autoY(){const v=visible();if(!v.length)return;const lo=+$('xmin').value
 function setAx(o){for(const k in o)$(k).value=o[k];}
 function axes(){const g=k=>num($(k).value);let xmin=g('xmin'),xmax=g('xmax'),ymin=g('ymin'),ymax=g('ymax');
  if(!(xmax>xmin)||!(ymax>ymin))return null;let xmaj=g('xmaj'),ymaj=g('ymaj');
- if(!(xmaj>0)||(xmax-xmin)/xmaj>60)xmaj=niceStep(xmax-xmin);if(!(ymaj>0)||(ymax-ymin)/ymaj>60)ymaj=niceStep(ymax-ymin);
+ if(!(xmaj>0)||(xmax-xmin)/xmaj>60)xmaj=autoMajor(xmax-xmin);if(!(ymaj>0)||(ymax-ymin)/ymaj>60)ymaj=autoMajor(ymax-ymin);
  return {xmin,xmax,ymin,ymax,xmaj,ymaj,xt:$('xt').value,yt:$('yt').value};}
 
 /* ---------- rich text: *italic*  ^{sup}  _{sub} ---------- */
