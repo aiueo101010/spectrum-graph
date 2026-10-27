@@ -47,7 +47,7 @@ function rich(g,s,x,y,size,align='center'){const rs=runs(s);const f=r=>`${r.i?'i
 let W=720,H=480;const PL=74,PR=18,PT=18,PB=60;
 function geom(a){const X=v=>PL+(v-a.xmin)/(a.xmax-a.xmin)*(W-PL-PR),Y=v=>H-PB-(v-a.ymin)/(a.ymax-a.ymin)*(H-PT-PB);
  const iX=px=>a.xmin+(px-PL)/(W-PL-PR)*(a.xmax-a.xmin),iY=py=>a.ymin+(H-PB-py)/(H-PT-PB)*(a.ymax-a.ymin);return {X,Y,iX,iY};}
-function dashArr(d,w){const u=Math.max(1,w);return d==='dash'?[4*u,3*u]:d==='sysdot'?[u,u]:d==='dashdot'?[4*u,2*u,u,2*u]:[];}
+function dashArr(d,w){const u=Math.max(d==='sysdot'?2:1,w);return d==='dash'?[4*u,3*u]:d==='sysdot'?[u,u]:d==='dashdot'?[4*u,2*u,u,2*u]:[];}
 function measureRich(g,s,size){let w=0;for(const r of runs(s)){g.font=`${r.i?'italic ':''}${r.sup||r.sub?size*0.7:size}px ${FONT}`;w+=g.measureText(r.t).width;}return w;}
 /* legend placed inside the plot area, sized to its text; splits into columns when it would not fit vertically */
 function legendLayout(g,v){const rowH=18,pad=6,key=32;const tw=Math.max(...v.map(s=>measureRich(g,s.name,12)));const colW=key+tw+10;
@@ -65,11 +65,11 @@ function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.h
  g.strokeStyle='#BFBFBF';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
  g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-14,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
  g.save();g.beginPath();g.rect(PL,PT,W-PL-PR,H-PT-PB);g.clip();g.lineJoin='round';g.lineCap='round';
- for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();let on=false;
+ for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.lineCap=s.dash==='solid'?'round':'butt';g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
  if(st.legend!=='none'){const L=legendLayout(g,v);if(live){LG=L;if(drag){g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);g.strokeRect(L.x-2.5,L.y-.5,L.w+3,L.h+1);g.setLineDash([]);}}
-  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}}
+  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}}
 
 const cv=$('cv');let LG=null,drag=null;
 function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
