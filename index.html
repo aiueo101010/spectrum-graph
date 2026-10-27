@@ -308,7 +308,9 @@ function legendLayout(g,v){const rowH=18,pad=6,key=32;const tw=Math.max(...v.map
 function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
  g.fillStyle='#fff';g.fillRect(0,0,W,H);const a=axes();const v=visible();
  if(!a||!v.length){g.fillStyle='#5E6F70';g.font=`14px ${FONT}`;g.textAlign='center';g.fillText(v.length?'軸の最小・最大を確認してください（最大 > 最小）':'スペクトルのファイルを読み込むとグラフが表示されます',W/2,H/2);return;}
- const {X,Y}=geom(a);const t0=k=>a[k+'min']; // Excel starts tick labels at the axis minimum
+ const {X,Y}=geom(a);
+ // at rest ticks start at the axis minimum (that is how Excel draws them); while the graph is being moved they stay fixed to the data so the scale slides with the curves
+ const t0=k=>k==='y'&&yMoving?Math.ceil(a.ymin/a.ymaj-1e-9)*a.ymaj:a[k+'min'];
  g.lineWidth=1;g.font=`12px ${FONT}`;g.fillStyle='#595959';
  for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(x,PT);g.lineTo(x,H-PB);g.stroke();}g.textAlign='center';g.fillText(fmtTick(v,a.xmaj),x,H-PB+17);}
  for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
@@ -330,25 +332,32 @@ const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)
 const inPlot=([x,y])=>x>=PL&&x<=W-PR&&y>=PT&&y<=H-PB;
 const onLegend=([x,y])=>LG&&x>=LG.x-6&&x<=LG.x+LG.w+6&&y>=LG.y-6&&y<=LG.y+LG.h+6;
 const rnd=(v,s)=>{const q=10**(Math.floor(Math.log10(s))-1);return +(Math.round(v/q)*q).toPrecision(10);};
-function setRange(xmin,xmax,ymin,ymax){st.auto.x=st.auto.y=false;const xs=xmax-xmin,ys=ymax-ymin;setAx({xmin:rnd(xmin,xs),xmax:rnd(xmax,xs),ymin:rnd(ymin,ys),ymax:rnd(ymax,ys),xmaj:'',ymaj:''});render();}
+// zoom result is put on whole ticks so the axis labels start on a gridline (same in the preview and in Excel)
+function setRange(xmin,xmax,ymin,ymax,dir=0){st.auto.x=st.auto.y=false;const cur=axes();
+ const fit=(lo,hi,k)=>{const man=num($(k+'maj').value);const m=man>0&&(hi-lo)/man<=60?man:niceStep(hi-lo);let a1=Math.round(lo/m)*m,a2=Math.round(hi/m)*m;
+  if(cur&&dir&&Math.abs(a1-cur[k+'min'])<m*1e-6&&Math.abs(a2-cur[k+'max'])<m*1e-6){a1-=dir*m;a2+=dir*m;}if(a2-a1<m){a1=Math.floor(lo/m)*m;a2=a1+m;}return [+a1.toFixed(10),+a2.toFixed(10)];};
+ const [x1,x2]=fit(xmin,xmax,'x'),[y1,y2]=fit(ymin,ymax,'y');setAx({xmin:x1,xmax:x2,ymin:y1,ymax:y2});render();}
 function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a.xmin+(a.xmax-a.xmin)*fx,cy=a.ymin+(a.ymax-a.ymin)*fy;
- setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f);}
+ setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f,f<1?-1:1);}
 function readout(p){const a=axes(),ro=$('readout');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
 function legendButtons(){$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===st.legend?'true':'false'));}
-let ypan=null;
+let ypan=null,yMoving=false,snapAnim=0;
 // touches that start on the legend or inside the plot area are handled here, not as page scrolling
 cv.addEventListener('touchstart',e=>{if(e.touches.length===1){const p=toCanvas(e.touches[0]);if(onLegend(p)||(axes()&&inPlot(p)))e.preventDefault();}},{passive:false});
 cv.addEventListener('pointerdown',e=>{const p=toCanvas(e);if(!axes()||drag||ypan)return;
  if(onLegend(p)){drag={dx:p[0]-LG.x,dy:p[1]-LG.y,w:LG.w,h:LG.h};cv.setPointerCapture(e.pointerId);render();}
- else if(inPlot(p)){ypan={y:p[1],a:axes(),id:e.pointerId};cv.setPointerCapture(e.pointerId);readout(p);}});
+ else if(inPlot(p)){cancelAnimationFrame(snapAnim);ypan={y:p[1],a:axes(),maj:$('ymaj').value,id:e.pointerId};yMoving=true;cv.setPointerCapture(e.pointerId);readout(p);}});
 cv.addEventListener('pointermove',e=>{const p=toCanvas(e);
  if(drag){const fw=Math.max(1,W-PL-PR-drag.w),fh=Math.max(1,H-PT-PB-drag.h);
   st.legend='custom';st.lpos={fx:Math.min(1,Math.max(0,(p[0]-drag.dx-PL)/fw)),fy:Math.min(1,Math.max(0,(p[1]-drag.dy-PT)/fh))};legendButtons();render();return;}
  if(ypan&&e.pointerId===ypan.id){const a=ypan.a,span=a.ymax-a.ymin,s=(p[1]-ypan.y)/(H-PT-PB)*span;   // drag down = curves move down
-  const q=a.ymaj/2,sn=Math.round(s/q)*q;   // snap to half a tick so the axis labels stay tidy
-  st.auto.y=false;setAx({ymin:+(a.ymin+sn).toFixed(10),ymax:+(a.ymax+sn).toFixed(10),ymaj:''});render();readout(p);return;}
+  const d=decOf(a.ymaj)+3;st.auto.y=false;setAx({ymin:+(a.ymin+s).toFixed(d),ymax:+(a.ymax+s).toFixed(d),ymaj:ypan.maj});render();readout(p);return;}
  if(e.pointerType==='mouse'){cv.style.cursor=onLegend(p)?'move':inPlot(p)?'ns-resize':'default';readout(p);}});
-function up(e){if(drag){drag=null;render();}if(ypan&&e.pointerId===ypan.id)ypan=null;}
+function up(e){if(drag){drag=null;render();}if(ypan&&e.pointerId===ypan.id){ypan=null;snapY();}}
+// after moving, glide to the nearest gridline so the minimum is a whole tick again (clean labels, identical in Excel)
+function snapY(){const a=axes();if(!a){yMoving=false;render();return;}const span=a.ymax-a.ymin,from=a.ymin,to=+(Math.round(a.ymin/a.ymaj)*a.ymaj).toFixed(10),maj=$('ymaj').value,t0=performance.now();
+ const step=t=>{const k=Math.min(1,(t-t0)/160),e=1-(1-k)**3,m=k<1?from+(to-from)*e:to;setAx({ymin:k<1?m:to,ymax:k<1?m+span:+(to+span).toFixed(10),ymaj:maj});if(k<1){render();snapAnim=requestAnimationFrame(step);}else{yMoving=false;render();}};
+ snapAnim=requestAnimationFrame(step);}
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('readout').hidden=true;});
 $('zin').addEventListener('click',()=>zoom(0.8));$('zout').addEventListener('click',()=>zoom(1.25));
