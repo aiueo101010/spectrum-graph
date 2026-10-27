@@ -75,7 +75,8 @@ function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.h
  for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
  g.strokeStyle='#BFBFBF';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
  g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-PB+46,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
- g.save();g.beginPath();g.rect(PL,PT,W-PL-PR,H-PT-PB);g.clip();g.lineJoin='round';g.lineCap='round';
+ g.save();const cm=Math.max(...v.map(s=>s.width*1.333))/2+1;g.beginPath();g.rect(PL-cm,PT-cm,W-PL-PR+2*cm,H-PT-PB+2*cm);g.clip();   // clip a line-width outside the frame so curves lying on an edge are not cut in half (Excel does not cut them either)
+ g.lineJoin='round';g.lineCap='round';
  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.lineCap=s.dash==='solid'?'round':'butt';g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
