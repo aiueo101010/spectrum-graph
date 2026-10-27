@@ -48,6 +48,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.drop:focus-visibl
 .btn.icon{padding:2px 8px;font-size:13px;font-weight:400;line-height:1.4}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;background:var(--paper)}
+.hint.how{color:var(--ink);background:var(--soft);border-radius:8px;padding:8px 12px}
+.hint.how b{color:var(--accent)}
+.drop .sub{font-size:12px}
 .drop.over{border-color:var(--accent);color:var(--ink)}
 .series{display:grid;gap:8px}
 .s{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:4px 8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--paper)}
@@ -90,7 +93,8 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
  <div class="col">
   <section class="box">
    <h2>スペクトル<span class="tag" id="count"></span></h2>
-   <div class="drop" id="drop" tabindex="0" role="button">ファイルをドラッグ、またはクリックして選択（複数可・.txt / .csv）<input id="file" type="file" multiple accept=".txt,.TXT,.csv,.CSV" class="sr"></div>
+   <p class="hint how"><b>使い方：</b>分光光度計で保存したスペクトルのファイル（.txt）を、<b>開いたり書き換えたりせず、そのまま</b>下の枠に入れるだけです。何本でもまとめて選べます。</p>
+   <div class="drop" id="drop" tabindex="0" role="button"><b>ここにファイルをドラッグ</b>、またはクリックして選択<br><span class="sub">保存したままの .txt（.csv も可）・複数まとめてOK</span><input id="file" type="file" multiple accept=".txt,.TXT,.csv,.CSV" class="sr"></div>
    <div class="row">
     <label class="f" style="grid-auto-flow:column;align-items:center;gap:6px">色をまとめて変更
      <select id="scheme" style="width:auto"><option value="">選ぶ…</option><option value="office">Excel標準の色</option><option value="btb">BTBの色（名前のpHから）</option><option value="grad">青 → 赤のグラデーション</option><option value="gray">黒 → 灰</option></select></label>
