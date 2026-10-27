@@ -52,9 +52,10 @@ function measureRich(g,s,size){let w=0;for(const r of runs(s)){g.font=`${r.i?'it
 /* legend placed inside the plot area, sized to its text; splits into columns when it would not fit vertically */
 function legendLayout(g,v){const rowH=18,pad=6,key=32;const tw=Math.max(...v.map(s=>measureRich(g,s.name,12)));const colW=key+tw+10;
  const avail=H-PT-PB-16;const maxRows=Math.max(1,Math.min(v.length,Math.floor((avail-pad*2)/rowH)));const cols=Math.ceil(v.length/maxRows),rows=Math.ceil(v.length/cols);
- const w=cols*colW,h=Math.min(v.length,rows)*rowH+pad*2;const p=st.legend;
- const x=p[1]==='l'?PL+8:W-PR-8-w,y=p[0]==='t'?PT+4:H-PB-4-h;return {x,y,w,h,rows,colW,rowH,pad};}
-function draw(cv,scale=1,sel){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
+ const w=cols*colW,h=Math.min(v.length,rows)*rowH+pad*2;const p=st.legend;let x,y;
+ if(p==='custom'){x=PL+st.lpos.fx*Math.max(0,W-PL-PR-w);y=PT+st.lpos.fy*Math.max(0,H-PT-PB-h);}   // dragged: stored as a share of the free space, so it stays inside at any size
+ else{x=p[1]==='l'?PL+8:W-PR-8-w;y=p[0]==='t'?PT+4:H-PB-4-h;}return {x,y,w,h,rows,colW,rowH,pad};}
+function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
  g.fillStyle='#fff';g.fillRect(0,0,W,H);const a=axes();const v=visible();
  if(!a||!v.length){g.fillStyle='#5E6F70';g.font=`14px ${FONT}`;g.textAlign='center';g.fillText(v.length?'軸の最小・最大を確認してください（最大 > 最小）':'スペクトルのファイルを読み込むとグラフが表示されます',W/2,H/2);return;}
  const {X,Y}=geom(a);const t0=k=>a[k+'min']; // Excel starts tick labels at the axis minimum
@@ -67,48 +68,44 @@ function draw(cv,scale=1,sel){const g=cv.getContext('2d');cv.width=W*scale;cv.he
  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
- if(st.legend!=='none'){const L=legendLayout(g,v);
-  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}
- if(sel){g.fillStyle='rgba(47,93,98,.12)';g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);const x=Math.min(sel[0],sel[2]),y=Math.min(sel[1],sel[3]);g.fillRect(x,y,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.strokeRect(x+.5,y+.5,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.setLineDash([]);}}
-const cv=$('cv');let sel=null;
-function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
-function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),sel);note();}
+ if(st.legend!=='none'){const L=legendLayout(g,v);if(live){LG=L;if(drag){g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);g.strokeRect(L.x-2.5,L.y-.5,L.w+3,L.h+1);g.setLineDash([]);}}
+  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}}
 
-/* ---------- zoom / pan / readout: mouse = drag-rectangle + wheel, touch = pinch + one-finger sideways pan ---------- */
+const cv=$('cv');let LG=null,drag=null;
+function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
+function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];LG=null;draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),true);note();}
+
+/* ---------- legend drag (mouse & touch), pinch zoom (touch), readout ---------- */
 const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H];};
 const inPlot=([x,y])=>x>=PL&&x<=W-PR&&y>=PT&&y<=H-PB;
+const onLegend=([x,y])=>LG&&x>=LG.x-6&&x<=LG.x+LG.w+6&&y>=LG.y-6&&y<=LG.y+LG.h+6;
 const rnd=(v,s)=>{const q=10**(Math.floor(Math.log10(s))-1);return +(Math.round(v/q)*q).toPrecision(10);};
 function setRange(xmin,xmax,ymin,ymax){st.auto.x=st.auto.y=false;const xs=xmax-xmin,ys=ymax-ymin;setAx({xmin:rnd(xmin,xs),xmax:rnd(xmax,xs),ymin:rnd(ymin,ys),ymax:rnd(ymax,ys),xmaj:'',ymaj:''});render();}
 function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a.xmin+(a.xmax-a.xmin)*fx,cy=a.ymin+(a.ymax-a.ymin)*fy;
  setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f);}
 function readout(p){const a=axes(),ro=$('readout');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
-const touches=new Map();let pinch=null,pan=null,lastTap=0;
+function legendButtons(){$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===st.legend?'true':'false'));}
+const touches=new Map();let pinch=null,lastTap=0,tapStart=null;
 function reset(){st.auto.x=st.auto.y=true;render();}
+// a touch that starts on the legend must not scroll the page
+cv.addEventListener('touchstart',e=>{if(e.touches.length===1&&onLegend(toCanvas(e.touches[0])))e.preventDefault();},{passive:false});
 cv.addEventListener('pointerdown',e=>{const p=toCanvas(e);if(!axes())return;
- if(e.pointerType==='mouse'){if(!inPlot(p))return;sel=[...p,...p];cv.setPointerCapture(e.pointerId);return;}
- touches.set(e.pointerId,p);cv.setPointerCapture(e.pointerId);
- if(touches.size===2){const [q1,q2]=[...touches.values()];pinch={d:Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1,c:[(q1[0]+q2[0])/2,(q1[1]+q2[1])/2],a:axes()};pan=null;}
- else if(touches.size===1){pan={p,a:axes(),moved:false};readout(p);}});
-cv.addEventListener('pointermove',e=>{const p=toCanvas(e);
- if(e.pointerType==='mouse'){readout(p);if(sel){sel[2]=Math.min(Math.max(p[0],PL),W-PR);sel[3]=Math.min(Math.max(p[1],PT),H-PB);render();}return;}
- if(!touches.has(e.pointerId))return;touches.set(e.pointerId,p);
- if(pinch&&touches.size===2){const [q1,q2]=[...touches.values()];const d=Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1;
-  zoom(pinch.d/d,(pinch.c[0]-PL)/(W-PL-PR),(H-PB-pinch.c[1])/(H-PT-PB),pinch.a);}
- else if(pan){const dx=p[0]-pan.p[0];if(Math.abs(dx)>4)pan.moved=true;if(pan.moved){const a=pan.a,s=(a.xmax-a.xmin)/(W-PL-PR)*dx;st.auto.x=false;const xs=a.xmax-a.xmin;setAx({xmin:rnd(a.xmin-s,xs),xmax:rnd(a.xmax-s,xs),xmaj:''});render();}readout(p);}});
-function up(e){if(e.pointerType==='mouse'){if(!sel)return;const s=sel;sel=null;const a=axes();
-  if(a&&Math.abs(s[2]-s[0])>8&&Math.abs(s[3]-s[1])>8){const {iX,iY}=geom(a);const x1=iX(Math.min(s[0],s[2])),x2=iX(Math.max(s[0],s[2])),y1=iY(Math.max(s[1],s[3])),y2=iY(Math.min(s[1],s[3]));
-   const fx=(lo,hi)=>{const m=niceStep(hi-lo);return [+(Math.floor(lo/m+1e-9)*m).toFixed(10),+(Math.ceil(hi/m-1e-9)*m).toFixed(10)];};const [xa,xb]=fx(x1,x2),[ya,yb]=fx(y1,y2);
-   st.auto.x=st.auto.y=false;setAx({xmin:xa,xmax:xb,ymin:ya,ymax:yb,xmaj:'',ymaj:''});}
-  render();return;}
- const wasTap=pan&&!pan.moved&&touches.size===1;touches.delete(e.pointerId);
- if(touches.size<2)pinch=null;if(!touches.size)pan=null;
- if(wasTap&&e.type==='pointerup'){const t=Date.now();if(t-lastTap<320){reset();lastTap=0;}else lastTap=t;}}
+ if(e.pointerType!=='mouse'){touches.set(e.pointerId,p);if(touches.size===2){drag=null;const [q1,q2]=[...touches.values()];pinch={d:Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1,c:[(q1[0]+q2[0])/2,(q1[1]+q2[1])/2],a:axes()};cv.setPointerCapture(e.pointerId);return;}}
+ if(onLegend(p)){drag={dx:p[0]-LG.x,dy:p[1]-LG.y,w:LG.w,h:LG.h};cv.setPointerCapture(e.pointerId);render();}
+ else if(e.pointerType!=='mouse'){tapStart=p;readout(p);}});
+cv.addEventListener('pointermove',e=>{const p=toCanvas(e);if(touches.has(e.pointerId))touches.set(e.pointerId,p);
+ if(drag){const fw=Math.max(1,W-PL-PR-drag.w),fh=Math.max(1,H-PT-PB-drag.h);
+  st.legend='custom';st.lpos={fx:Math.min(1,Math.max(0,(p[0]-drag.dx-PL)/fw)),fy:Math.min(1,Math.max(0,(p[1]-drag.dy-PT)/fh))};legendButtons();render();return;}
+ if(pinch&&touches.size===2){const [q1,q2]=[...touches.values()];const d=Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1;zoom(pinch.d/d,(pinch.c[0]-PL)/(W-PL-PR),(H-PB-pinch.c[1])/(H-PT-PB),pinch.a);return;}
+ if(e.pointerType==='mouse'){cv.style.cursor=onLegend(p)?'move':'crosshair';readout(p);}});
+function up(e){const p=toCanvas(e);if(drag){drag=null;render();}
+ if(e.pointerType!=='mouse'){touches.delete(e.pointerId);if(touches.size<2)pinch=null;
+  if(tapStart&&e.type==='pointerup'&&Math.hypot(p[0]-tapStart[0],p[1]-tapStart[1])<10){const t=Date.now();if(t-lastTap<320){reset();lastTap=0;}else lastTap=t;}tapStart=null;}}
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('readout').hidden=true;});
-cv.addEventListener('wheel',e=>{const p=toCanvas(e);if(!axes()||!inPlot(p))return;e.preventDefault();zoom(e.deltaY>0?1.25:0.8,(p[0]-PL)/(W-PL-PR),(H-PB-p[1])/(H-PT-PB));},{passive:false});
 $('zin').addEventListener('click',()=>zoom(0.8));$('zout').addEventListener('click',()=>zoom(1.25));
-cv.addEventListener('dblclick',e=>{if(!e.pointerType||e.pointerType==='mouse')reset();});
-if(matchMedia('(pointer: coarse)').matches)$('gesture').textContent='2本指で拡大縮小 · 1本指で左右に移動 · ダブルタップで元に戻す';
+cv.addEventListener('dblclick',e=>{if(!onLegend(toCanvas(e)))reset();});
+$('gesture').textContent=matchMedia('(pointer: coarse)').matches?'凡例は指でドラッグして移動 · 2本指で拡大縮小 · ダブルタップで範囲を元に戻す':'凡例はドラッグして移動 · ダブルクリックで範囲を元に戻す';
 
 /* ---------- series list ---------- */
 function list(){const box=$('series');box.innerHTML='';$('count').textContent=st.series.length?st.series.length+' 本':'';
@@ -162,7 +159,7 @@ drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'
 ['xt','yt','xmin','xmax','xmaj','ymin','ymax','ymaj'].forEach(k=>$(k).addEventListener('input',()=>{if(/^x(min|max|maj)$/.test(k))st.auto.x=false;if(/^y(min|max|maj)$/.test(k))st.auto.y=false;touch();render();}));
 $('xauto').addEventListener('click',()=>{st.auto.x=true;render();});$('yauto').addEventListener('click',()=>{st.auto.y=true;render();});
 $('grid').addEventListener('change',e=>{st.grid=e.target.checked;render();});
-$('legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.legend=b.dataset.v;$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));render();}));
+$('legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.legend=b.dataset.v;legendButtons();render();}));
 $('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value='';if(!k)return;const n=st.series.length;
  st.series.forEach((s,i)=>{if(k==='office')s.color=OFFICE[i%OFFICE.length];else if(k==='btb'){const m=s.name.match(/pH\s*([0-9]+(?:\.[0-9]+)?)/i)||s.name.match(/([0-9]+(?:\.[0-9]+)?)/);if(m)s.color=btbColor(+m[1]);}
   else{const t=n>1?i/(n-1):0;const [c1,c2]=k==='grad'?[[33,64,200],[200,40,40]]:[[0,0,0],[170,170,170]];s.color='#'+c1.map((v,j)=>Math.round(v+(c2[j]-v)*t).toString(16).padStart(2,'0')).join('').toUpperCase();}});
