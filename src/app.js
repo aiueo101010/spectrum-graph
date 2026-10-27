@@ -75,7 +75,7 @@ const cv=$('cv');let LG=null,drag=null;
 function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
 function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];LG=null;draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),true);note();}
 
-/* ---------- legend drag (mouse & touch), pinch zoom (touch), readout ---------- */
+/* ---------- drag: legend → move legend, plot area → move the y range up/down (mouse & touch) ---------- */
 const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H];};
 const inPlot=([x,y])=>x>=PL&&x<=W-PR&&y>=PT&&y<=H-PB;
 const onLegend=([x,y])=>LG&&x>=LG.x-6&&x<=LG.x+LG.w+6&&y>=LG.y-6&&y<=LG.y+LG.h+6;
@@ -85,25 +85,24 @@ function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a
  setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f);}
 function readout(p){const a=axes(),ro=$('readout');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
 function legendButtons(){$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===st.legend?'true':'false'));}
-const touches=new Map();let pinch=null;
-// a touch that starts on the legend must not scroll the page
-cv.addEventListener('touchstart',e=>{if(e.touches.length===1&&onLegend(toCanvas(e.touches[0])))e.preventDefault();},{passive:false});
-cv.addEventListener('pointerdown',e=>{const p=toCanvas(e);if(!axes())return;
- if(e.pointerType!=='mouse'){touches.set(e.pointerId,p);if(touches.size===2){drag=null;const [q1,q2]=[...touches.values()];pinch={d:Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1,c:[(q1[0]+q2[0])/2,(q1[1]+q2[1])/2],a:axes()};cv.setPointerCapture(e.pointerId);return;}}
+let ypan=null;
+// touches that start on the legend or inside the plot area are handled here, not as page scrolling
+cv.addEventListener('touchstart',e=>{if(e.touches.length===1){const p=toCanvas(e.touches[0]);if(onLegend(p)||(axes()&&inPlot(p)))e.preventDefault();}},{passive:false});
+cv.addEventListener('pointerdown',e=>{const p=toCanvas(e);if(!axes()||drag||ypan)return;
  if(onLegend(p)){drag={dx:p[0]-LG.x,dy:p[1]-LG.y,w:LG.w,h:LG.h};cv.setPointerCapture(e.pointerId);render();}
- else if(e.pointerType!=='mouse')readout(p);});
-cv.addEventListener('pointermove',e=>{const p=toCanvas(e);if(touches.has(e.pointerId))touches.set(e.pointerId,p);
+ else if(inPlot(p)){ypan={y:p[1],a:axes(),id:e.pointerId};cv.setPointerCapture(e.pointerId);readout(p);}});
+cv.addEventListener('pointermove',e=>{const p=toCanvas(e);
  if(drag){const fw=Math.max(1,W-PL-PR-drag.w),fh=Math.max(1,H-PT-PB-drag.h);
   st.legend='custom';st.lpos={fx:Math.min(1,Math.max(0,(p[0]-drag.dx-PL)/fw)),fy:Math.min(1,Math.max(0,(p[1]-drag.dy-PT)/fh))};legendButtons();render();return;}
- if(pinch&&touches.size===2){const [q1,q2]=[...touches.values()];const d=Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1;zoom(pinch.d/d,(pinch.c[0]-PL)/(W-PL-PR),(H-PB-pinch.c[1])/(H-PT-PB),pinch.a);return;}
- if(e.pointerType==='mouse'){cv.style.cursor=onLegend(p)?'move':'crosshair';readout(p);}});
-function up(e){const p=toCanvas(e);if(drag){drag=null;render();}
- if(e.pointerType!=='mouse'){touches.delete(e.pointerId);if(touches.size<2)pinch=null;
-  }}
+ if(ypan&&e.pointerId===ypan.id){const a=ypan.a,span=a.ymax-a.ymin,s=(p[1]-ypan.y)/(H-PT-PB)*span;   // drag down = curves move down
+  const q=a.ymaj/2,sn=Math.round(s/q)*q;   // snap to half a tick so the axis labels stay tidy
+  st.auto.y=false;setAx({ymin:+(a.ymin+sn).toFixed(10),ymax:+(a.ymax+sn).toFixed(10),ymaj:''});render();readout(p);return;}
+ if(e.pointerType==='mouse'){cv.style.cursor=onLegend(p)?'move':inPlot(p)?'ns-resize':'default';readout(p);}});
+function up(e){if(drag){drag=null;render();}if(ypan&&e.pointerId===ypan.id)ypan=null;}
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('readout').hidden=true;});
 $('zin').addEventListener('click',()=>zoom(0.8));$('zout').addEventListener('click',()=>zoom(1.25));
-$('gesture').textContent=matchMedia('(pointer: coarse)').matches?'凡例は指でドラッグして移動 · 2本指で拡大縮小':'凡例はドラッグして移動';
+$('gesture').textContent='グラフをドラッグで上下に移動 · 凡例はドラッグで移動';
 
 /* ---------- series list ---------- */
 function list(){const box=$('series');box.innerHTML='';$('count').textContent=st.series.length?st.series.length+' 本':'';
