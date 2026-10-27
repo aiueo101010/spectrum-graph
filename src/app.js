@@ -95,7 +95,10 @@ function setRange(xmin,xmax,ymin,ymax,dir=0){st.auto.x=st.auto.y=false;const cur
  const [x1,x2]=fit(xmin,xmax,'x'),[y1,y2]=fit(ymin,ymax,'y');setAx({xmin:x1,xmax:x2,ymin:y1,ymax:y2});render();}
 function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a.xmin+(a.xmax-a.xmin)*fx,cy=a.ymin+(a.ymax-a.ymin)*fy;
  setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f,f<1?-1:1);}
-function readout(p){const a=axes(),ro=$('readout');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
+let roTimer=0;
+// mouse: follows the pointer. touch: appears while the finger is down, stays ~3 s after lifting, then fades out
+function readout(p){const a=axes(),ro=$('readout');clearTimeout(roTimer);ro.classList.remove('fade');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
+function fadeReadout(){const ro=$('readout');clearTimeout(roTimer);if(ro.hidden)return;roTimer=setTimeout(()=>{ro.classList.add('fade');roTimer=setTimeout(()=>{ro.hidden=true;ro.classList.remove('fade');},600);},3000);}
 function legendButtons(){$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===st.legend?'true':'false'));}
 let ypan=null,yMoving=false,snapAnim=0;
 // touches that start on the legend or inside the plot area are handled here, not as page scrolling
@@ -109,7 +112,7 @@ cv.addEventListener('pointermove',e=>{const p=toCanvas(e);
  if(ypan&&e.pointerId===ypan.id){const a=ypan.a,span=a.ymax-a.ymin,s=(p[1]-ypan.y)/(H-PT-PB)*span;   // drag down = curves move down
   const d=decOf(a.ymaj)+3;st.auto.y=false;setAx({ymin:+(a.ymin+s).toFixed(d),ymax:+(a.ymax+s).toFixed(d),ymaj:ypan.maj});render();readout(p);return;}
  if(e.pointerType==='mouse'){cv.style.cursor=onLegend(p)?'move':inPlot(p)?'ns-resize':'default';readout(p);}});
-function up(e){if(drag){drag=null;render();}if(ypan&&e.pointerId===ypan.id){ypan=null;snapY();}}
+function up(e){if(drag){drag=null;render();}if(ypan&&e.pointerId===ypan.id){ypan=null;snapY();}if(e.pointerType!=='mouse')fadeReadout();}
 // after moving, glide to the nearest gridline so the minimum is a whole tick again (clean labels, identical in Excel)
 function snapY(){const a=axes();if(!a){yMoving=false;render();return;}const span=a.ymax-a.ymin,from=a.ymin,to=+(Math.round(a.ymin/a.ymaj)*a.ymaj).toFixed(10),maj=$('ymaj').value,t0=performance.now();
  const step=t=>{const k=Math.min(1,(t-t0)/160),e=1-(1-k)**3,m=k<1?from+(to-from)*e:to;setAx({ymin:k<1?m:to,ymax:k<1?m+span:+(to+span).toFixed(10),ymaj:maj});if(k<1){render();snapAnim=requestAnimationFrame(step);}else{yMoving=false;render();}};
