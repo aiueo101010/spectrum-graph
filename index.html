@@ -1,0 +1,420 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>スペクトルグラフメーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* layout: series list (left) + live chart with axis controls (right, sticky), export bar at the bottom */
+:root{
+ --paper:#F6F8F7; --card:#FFFFFF; --ink:#1E2B2C; --muted:#5E6F70; --line:#D5DFDD;
+ --accent:#2F5D62; --accent-ink:#FFFFFF; --soft:#E6EFED; --warn:#9A5B12; --warn-bg:#FBF1E2; --bad:#A63A2E;
+ --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+ --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+ --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
+ --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}}
+:root[data-theme="dark"]{
+ --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
+ --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px;display:grid;gap:20px}
+header{display:grid;gap:6px}
+h1{font-size:clamp(22px,3.2vw,30px);margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 small{font-family:var(--f-mono);font-size:.5em;font-weight:500;color:var(--muted);margin-left:.6em;letter-spacing:.06em}
+.lead{margin:0;color:var(--muted);max-width:72ch}
+.lead a{color:var(--accent)}
+[hidden]{display:none!important}
+.panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px;align-items:start}
+@media (max-width:900px){.panel{grid-template-columns:1fr}}
+.col{display:grid;gap:16px;min-width:0}
+.sticky{position:sticky;top:12px}
+@media (max-width:900px){.sticky{position:static;order:-1}}
+section.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:12px;min-width:0}
+h2{font-size:16px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .tag{font-family:var(--f-mono);font-size:11px;font-weight:500;letter-spacing:.08em;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint code{font-family:var(--f-mono);background:var(--soft);padding:0 4px;border-radius:4px;color:var(--ink)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+@media (max-width:480px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+label.f{display:grid;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
+input[type=number],input[type=text],select{font:inherit;font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0;box-sizing:border-box}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:11px 18px;font-size:15px}
+.btn.small{padding:4px 10px;font-size:13px;font-weight:400}
+.btn.icon{padding:2px 8px;font-size:13px;font-weight:400;line-height:1.4}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;background:var(--paper)}
+.drop.over{border-color:var(--accent);color:var(--ink)}
+.series{display:grid;gap:8px}
+.s{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:4px 8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--paper)}
+.s.off{opacity:.55}
+.s .file{grid-column:3/-1;grid-row:2;font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s .opts{display:flex;gap:6px}
+.s .opts select{width:auto;padding:5px 6px;font-size:13px}
+@media (max-width:560px){.s{grid-template-columns:auto auto minmax(0,1fr) auto}.s .opts{grid-column:1/-1;grid-row:3}.s .moves{grid-column:4;grid-row:1}}
+.s .moves{display:flex;gap:4px}
+.empty{color:var(--muted);font-size:13px;padding:6px 2px}
+.chartbox{position:relative}
+canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:pan-y;cursor:crosshair}
+.readout{position:absolute;right:10px;bottom:8px;font-family:var(--f-mono);font-size:12px;color:#5E6F70;background:rgba(255,255,255,.85);padding:1px 6px;border-radius:4px;pointer-events:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:var(--card);color:var(--muted);padding:5px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.axis{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.axis h3 .btn[aria-pressed="true"]{background:var(--soft);color:var(--accent);border-color:var(--soft)}
+.axis h3{font-size:13px;margin:0;display:flex;justify-content:space-between;align-items:center}
+.bar{position:sticky;bottom:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.bar p{margin:0;font-size:13px;color:var(--muted);min-width:0;flex:1 1 240px}
+@media (max-width:600px){.bar{position:static}}
+.msg{font-size:13px;margin:0}
+@media (pointer:coarse),(max-width:600px){input[type=number],input[type=text],select{font-size:16px}.btn.icon{padding:6px 12px}.seg button{padding:8px 11px}}
+@media (max-width:600px){.wrap{padding-block:18px 32px}section.box{padding:14px}.panel{gap:14px}.readout{font-size:11px}}
+.msg.err{color:var(--bad)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:no-preference){.btn{transition:border-color .15s}}
+</style>
+
+<div class="wrap">
+<header>
+ <h1>スペクトルグラフメーカー<small>SPECTRA · XLSX / PNG</small></h1>
+ <p class="lead">分光光度計のテキストファイルを何本でも重ねて、線の色・種類・太さ、軸の名前と範囲を自由に決めて、Excelのグラフ（または画像）にします。グラフ上のドラッグやマウスホイール、「拡大」「縮小」ボタンで、表示範囲を自由に変えられます。</p>
+</header>
+
+<div class="panel">
+ <div class="col">
+  <section class="box">
+   <h2>スペクトル<span class="tag" id="count"></span></h2>
+   <div class="drop" id="drop" tabindex="0" role="button">ファイルをドラッグ、またはクリックして選択（複数可・.txt / .csv）<input id="file" type="file" multiple accept=".txt,.TXT,.csv,.CSV" class="sr"></div>
+   <div class="row">
+    <label class="f" style="grid-auto-flow:column;align-items:center;gap:6px">色をまとめて変更
+     <select id="scheme" style="width:auto"><option value="">選ぶ…</option><option value="office">Excel標準の色</option><option value="btb">BTBの色（名前のpHから）</option><option value="grad">青 → 赤のグラデーション</option><option value="gray">黒 → 灰</option></select></label>
+    <button class="btn small" id="clearall" type="button">全部削除</button>
+    <button class="btn small" id="sample" type="button">サンプルに戻す</button>
+   </div>
+   <div class="series" id="series"></div>
+   <p class="msg" id="msg" role="status"></p>
+  </section>
+ </div>
+
+ <div class="col sticky">
+  <section class="box">
+   <div class="row" style="justify-content:space-between"><h2>グラフ<span class="tag" id="gesture">ドラッグ・ホイールで拡大縮小 · ダブルクリックで元に戻す</span></h2><div class="row" style="gap:6px"><button class="btn icon" type="button" id="zin" aria-label="拡大">＋ 拡大</button><button class="btn icon" type="button" id="zout" aria-label="縮小">− 縮小</button></div></div>
+   <div class="chartbox"><canvas id="cv" width="720" height="480" aria-label="スペクトルのグラフのプレビュー"></canvas><span class="readout" id="readout" hidden></span></div>
+   <div class="row" style="justify-content:space-between">
+    <div class="row"><span class="hint">凡例</span><div class="seg" id="legend" role="group" aria-label="凡例の位置">
+     <button type="button" data-v="tr" aria-pressed="true">右上</button><button type="button" data-v="tl" aria-pressed="false">左上</button><button type="button" data-v="br" aria-pressed="false">右下</button><button type="button" data-v="bl" aria-pressed="false">左下</button><button type="button" data-v="none" aria-pressed="false">なし</button></div></div>
+    <label class="row" style="gap:6px;font-size:13px;color:var(--muted)"><input type="checkbox" id="grid" checked>目盛線</label>
+   </div>
+   <div class="axis">
+    <h3>横軸<button class="btn icon" type="button" id="xauto">範囲を自動</button></h3>
+    <label class="f">名前<input type="text" id="xt"></label>
+    <div class="grid3"><label class="f">最小<input type="number" id="xmin" step="any"></label><label class="f">最大<input type="number" id="xmax" step="any"></label><label class="f">目盛の間隔<input type="number" id="xmaj" step="any" placeholder="自動"></label></div>
+   </div>
+   <div class="axis">
+    <h3>縦軸<button class="btn icon" type="button" id="yauto">範囲を自動</button></h3>
+    <label class="f">名前<input type="text" id="yt"></label>
+    <div class="grid3"><label class="f">最小<input type="number" id="ymin" step="any"></label><label class="f">最大<input type="number" id="ymax" step="any"></label><label class="f">目盛の間隔<input type="number" id="ymaj" step="any" placeholder="自動"></label></div>
+   </div>
+   <p class="hint">名前の書き方：<code>*λ*</code> → 斜体、<code>^{-1}</code> → 上付き、<code>_{max}</code> → 下付き（例 <code>*ε* / L mol^{-1} cm^{-1}</code>）</p>
+  </section>
+ </div>
+</div>
+
+<div class="bar">
+ <p id="note"></p>
+ <div class="row"><button class="btn" id="png" type="button">画像（PNG）で保存</button><button class="btn primary" id="xlsx" type="button">Excelファイルを作成</button></div>
+</div>
+<p class="msg" id="save-msg" role="status"></p>
+</div>
+
+<script>
+/* ---- minimal XLSX writer with native scatter charts (no dependencies) ---- */
+const XL=(()=>{
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* --- zip (store, no compression) --- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;};
+function zip(files){const enc=new TextEncoder();const parts=[],cent=[];let off=0;
+ for(const [name,str] of files){const nb=enc.encode(name),db=enc.encode(str),c=crc32(db);
+  const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,0,true);h.setUint16(12,0x21,true);h.setUint32(14,c,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+  parts.push(new Uint8Array(h.buffer),nb,db);
+  const cd=new DataView(new ArrayBuffer(46));cd.setUint32(0,0x02014b50,true);cd.setUint16(4,20,true);cd.setUint16(6,20,true);cd.setUint16(8,0x0800,true);cd.setUint16(10,0,true);cd.setUint16(12,0,true);cd.setUint16(14,0x21,true);cd.setUint32(16,c,true);cd.setUint32(20,db.length,true);cd.setUint32(24,db.length,true);cd.setUint16(28,nb.length,true);cd.setUint32(42,off,true);
+  cent.push(new Uint8Array(cd.buffer),nb);off+=30+nb.length+db.length;}
+ const csize=cent.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csize,true);e.setUint32(16,off,true);
+ const all=[...parts,...cent,new Uint8Array(e.buffer)];const out=new Uint8Array(all.reduce((a,b)=>a+b.length,0));let p=0;for(const a of all){out.set(a,p);p+=a.length;}return out;}
+/* --- cell refs --- */
+const col=n=>{let s='';n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+const ref=(r,c)=>col(c)+(r+1);
+const aref=(sheet,r1,c1,r2,c2)=>`'${sheet}'!$${col(c1)}$${r1+1}`+(r2==null?'':`:$${col(c2)}$${r2+1}`);
+/* --- styles --- */
+const ST={def:0,head:1,n3:2,n6:3,sci:4,n2:5,n1:6,text:7,n4:8,title:9,note:10,bold:11,sub:12,n0:13,th:14,td:15,tdl:16,cap:17,tn:18,thl:19,tdlt:20};
+const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="6"><numFmt numFmtId="164" formatCode="0.000"/><numFmt numFmtId="165" formatCode="0.000000"/><numFmt numFmtId="166" formatCode="0.00E+00"/><numFmt numFmtId="167" formatCode="0.0"/><numFmt numFmtId="168" formatCode="0.0000"/><numFmt numFmtId="169" formatCode="0.00"/></numFmts><fonts count="7"><font><sz val="11"/><name val="Yu Gothic"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Yu Gothic"/><family val="2"/></font><font><b/><sz val="13"/><name val="Yu Gothic"/><family val="2"/></font><font><sz val="9"/><color rgb="FF595959"/><name val="Yu Gothic"/><family val="2"/></font><font><b/><sz val="11"/><name val="Yu Gothic"/><family val="2"/></font><font><sz val="10.5"/><name val="游明朝"/><family val="1"/><charset val="128"/></font><font><sz val="9"/><name val="游明朝"/><family val="1"/><charset val="128"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2F5D62"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF1EF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="6"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border><border><left/><right/><top style="medium"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top style="medium"><color rgb="FF000000"/></top><bottom style="medium"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF000000"/></top><bottom style="medium"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="21">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="169" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="167" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="168" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="5" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+/* --- rich text for chart titles: ^{} super, _{} sub, <i></i> italic --- */
+function richRuns(s,size=1000){const out=[];const re=/(\^\{[^}]*\}|_\{[^}]*\}|<i>.*?<\/i>)/g;let last=0,m;
+ const run=(t,attr='')=>`<a:r><a:rPr lang="ja-JP" sz="${size}" b="0"${attr}/><a:t>${esc(t)}</a:t></a:r>`;
+ while((m=re.exec(s))){if(m.index>last)out.push(run(s.slice(last,m.index)));const t=m[0];
+  if(t[0]==='^')out.push(run(t.slice(2,-1),' baseline="30000"'));else if(t[0]==='_')out.push(run(t.slice(2,-1),' baseline="-25000"'));else out.push(run(t.slice(3,-4),' i="1"'));last=re.lastIndex;}
+ if(last<s.length)out.push(run(s.slice(last)));return out.join('');}
+const plain=s=>String(s).replace(/\^\{([^}]*)\}/g,'$1').replace(/_\{([^}]*)\}/g,'$1').replace(/<\/?i>/g,'');
+const DASH={solid:'solid',dash:'dash',dot:'sysDot',sysdot:'sysDot',dashdot:'dashDot',longdash:'lgDash',sysdash:'sysDash'};const dsh=k=>DASH[k]||'solid';
+function numCache(vals){return `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${vals.length}"/>${vals.map((v,i)=>v==null||!isFinite(v)?'':`<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join('')}</c:numCache>`;}
+const GRAY='595959';
+function rich(m,sz=1000,color=GRAY){return richRuns(m,sz).replace(/<a:rPr([^>]*)\/>/g,`<a:rPr$1><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/></a:rPr>`);}
+function txPr(sz,color=GRAY){return `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz}" b="0"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Yu Gothic"/><a:ea typeface="Yu Gothic"/></a:defRPr></a:pPr><a:endParaRPr lang="ja-JP"/></a:p></c:txPr>`;}
+function axisXml(id,cross,pos,o){const sc=`<c:scaling><c:orientation val="minMax"/>${o.max!=null?`<c:max val="${o.max}"/>`:''}${o.min!=null?`<c:min val="${o.min}"/>`:''}</c:scaling>`;
+ return `<c:valAx><c:axId val="${id}"/>${sc}<c:delete val="0"/><c:axPos val="${pos}"/>${o.grid===false?'':'<c:majorGridlines><c:spPr><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill><a:round/></a:ln></c:spPr></c:majorGridlines>'}<c:title><c:tx><c:rich><a:bodyPr${pos==='l'?' rot="-5400000" vert="horz"':''}/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000" b="0"/></a:pPr>${rich(o.title||'')}</a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:numFmt formatCode="${esc(o.fmt||'General')}" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/><c:spPr><a:noFill/><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="BFBFBF"/></a:solidFill><a:round/></a:ln></c:spPr>${txPr(900)}<c:crossAx val="${cross}"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/>${o.major?`<c:majorUnit val="${o.major}"/>`:''}</c:valAx>`;}
+function chartXml(ch){
+ const sers=ch.series.map((s,i)=>{const color=s.color||'4472C4';
+  const line=s.line?`<a:ln w="${s.width||28575}" cap="rnd"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="${dsh(s.dash)}"/><a:round/></a:ln>`:'<a:ln w="25400" cap="rnd"><a:noFill/><a:round/></a:ln>';
+  const mk=s.marker&&s.marker!=='none'?`<c:marker><c:symbol val="${s.marker}"/><c:size val="${s.msize||7}"/><c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></c:spPr></c:marker>`:'<c:marker><c:symbol val="none"/></c:marker>';
+  const dl=s.labels&&s.labels.length?`<c:dLbls>${s.labels.map(L=>`<c:dLbl><c:idx val="${L.idx}"/><c:layout><c:manualLayout><c:x val="${L.x}"/><c:y val="${L.y}"/></c:manualLayout></c:layout><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p>${rich(L.text,1100,'000000')}</a:p></c:rich></c:tx><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbl>`).join('')}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/><c:extLst><c:ext uri="{CE6537A1-D6FC-4f65-9D91-7224C49458BB}" xmlns:c15="http://schemas.microsoft.com/office/drawing/2012/chart"><c15:showLeaderLines val="1"/><c15:leaderLines><c:spPr><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:round/></a:ln></c:spPr></c15:leaderLines></c:ext></c:extLst></c:dLbls>`:'';
+  let tl='';if(s.trend){const t=s.trend,tc=t.color||color;const lbl=t.label?`<c:trendlineLbl><c:layout><c:manualLayout><c:x val="${t.label.x}"/><c:y val="${t.label.y}"/></c:manualLayout></c:layout><c:tx><c:rich><a:bodyPr/><a:lstStyle/>${t.label.text.split('\n').map(ln=>`<a:p>${rich(ln,1000,'000000')}</a:p>`).join('')}</c:rich></c:tx><c:numFmt formatCode="General" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:trendlineLbl>`:'';
+   tl=`<c:trendline><c:name>${esc(t.name||'近似直線')}</c:name><c:spPr><a:ln w="19050" cap="rnd"><a:solidFill><a:srgbClr val="${tc}"/></a:solidFill><a:prstDash val="${dsh(t.dash||'sysdot')}"/></a:ln></c:spPr><c:trendlineType val="linear"/>${t.forward?`<c:forward val="${t.forward}"/>`:''}${t.backward?`<c:backward val="${t.backward}"/>`:''}<c:dispRSqr val="0"/><c:dispEq val="${t.label?1:0}"/>${lbl}</c:trendline>`;}
+  return `<c:ser><c:idx val="${i}"/><c:order val="${i}"/><c:tx><c:v>${esc(plain(s.name))}</c:v></c:tx><c:spPr>${line}</c:spPr>${mk}${dl}${tl}<c:xVal><c:numRef><c:f>${esc(s.xRef)}</c:f>${numCache(s.x)}</c:numRef></c:xVal><c:yVal><c:numRef><c:f>${esc(s.yRef)}</c:f>${numCache(s.y)}</c:numRef></c:yVal><c:smooth val="0"/></c:ser>`;}).join('');
+ const lg=ch.legend||{x:0.12,y:0.04,w:0.45,h:0.22};
+ const legend=ch.legend===false?'':`<c:legend><c:legendPos val="r"/><c:layout><c:manualLayout><c:xMode val="edge"/><c:yMode val="edge"/><c:x val="${lg.x}"/><c:y val="${lg.y}"/><c:w val="${lg.w}"/><c:h val="${lg.h}"/></c:manualLayout></c:layout><c:overlay val="1"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${txPr(1000)}</c:legend>`;
+ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:autoTitleDeleted val="1"/><c:plotArea><c:layout/><c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${sers}<c:axId val="500001"/><c:axId val="500002"/></c:scatterChart>${axisXml(500001,500002,'b',ch.x)}${axisXml(500002,500001,'l',ch.y)}<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr></c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>${txPr(1000)}</c:chartSpace>`;}
+function cellRich(m,st){const mincho=st>=14;const f=mincho?(st===18?'<sz val="9"/><rFont val="游明朝"/><family val="1"/><charset val="128"/>':'<sz val="10.5"/><rFont val="游明朝"/><family val="1"/><charset val="128"/>'):'<sz val="11"/><rFont val="Yu Gothic"/><family val="2"/>';
+ const out=[];const re=/(\^\{[^}]*\}|_\{[^}]*\}|<i>.*?<\/i>)/g;let last=0,mm;const run=(t,a='')=>t?`<r><rPr>${a}${f}</rPr><t xml:space="preserve">${esc(t)}</t></r>`:'';
+ while((mm=re.exec(m))){out.push(run(m.slice(last,mm.index)));const t=mm[0];if(t[0]==='^')out.push(run(t.slice(2,-1),'<vertAlign val="superscript"/>'));else if(t[0]==='_')out.push(run(t.slice(2,-1),'<vertAlign val="subscript"/>'));else out.push(run(t.slice(3,-4),'<i/>'));last=re.lastIndex;}
+ out.push(run(m.slice(last)));return out.join('')||'<t></t>';}
+/* --- workbook --- */
+class Sheet{constructor(name){this.name=name;this.cells=new Map();this.widths={};this.charts=[];this.merges=[];this.heights={};}
+ merge(r1,c1,r2,c2){this.merges.push(ref(r1,c1)+':'+ref(r2,c2));return this;}
+ set(r,c,v,s,f){this.cells.set(r*1000+c,{r,c,v,s:s??(typeof v==='number'?ST.n3:ST.def),f});return this;}
+ row(r,c0,vals,s){vals.forEach((v,i)=>{if(v!==undefined&&v!==null)this.set(r,c0+i,v,Array.isArray(s)?s[i]:s);});return this;}
+ width(c,w){this.widths[c]=w;return this;}
+ chart(ch,r,c,r2,c2){this.charts.push({ch,r,c,r2,c2});return this;}
+ xml(drawingRid){const rows={};for(const x of this.cells.values()){(rows[x.r]=rows[x.r]||[]).push(x);}
+  const rk=Object.keys(rows).map(Number).sort((a,b)=>a-b);
+  const sd=rk.map(r=>`<row r="${r+1}"${this.heights[r]?` ht="${this.heights[r]}" customHeight="1"`:''}>${rows[r].sort((a,b)=>a.c-b.c).map(x=>{const R=ref(x.r,x.c);
+   if(x.f!=null){const isStr=typeof x.v==='string';return `<c r="${R}" s="${x.s}"${isStr?' t="str"':''}><f>${esc(x.f)}</f>${x.v==null||(typeof x.v==='number'&&!isFinite(x.v))?'':`<v>${esc(x.v)}</v>`}</c>`;}
+   if(typeof x.v==='number')return isFinite(x.v)?`<c r="${R}" s="${x.s}"><v>${x.v}</v></c>`:`<c r="${R}" s="${x.s}" t="e"><v>#N/A</v></c>`;
+   if(x.v&&typeof x.v==='object'&&x.v.r!=null)return `<c r="${R}" s="${x.s}" t="inlineStr"><is>${cellRich(x.v.r,x.s)}</is></c>`;
+   return `<c r="${R}" s="${x.s}" t="inlineStr"><is><t xml:space="preserve">${esc(x.v)}</t></is></c>`;}).join('')}</row>`).join('');
+  const cols=Object.keys(this.widths).length?`<cols>${Object.entries(this.widths).sort((a,b)=>a[0]-b[0]).map(([c,w])=>`<col min="${+c+1}" max="${+c+1}" width="${w}" customWidth="1"/>`).join('')}</cols>`:'';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0" showGridLines="${this.grid===false?0:1}"/></sheetViews><sheetFormatPr defaultRowHeight="18"/>${cols}<sheetData>${sd}</sheetData>${this.merges.length?`<mergeCells count="${this.merges.length}">${this.merges.map(m=>`<mergeCell ref="${m}"/>`).join('')}</mergeCells>`:''}${drawingRid?`<drawing r:id="${drawingRid}"/>`:''}</worksheet>`;}}
+function build(sheets){const files=[];let chartN=0,drawN=0;const ct=[],wbRels=[],wbSheets=[];
+ sheets.forEach((sh,i)=>{const n=i+1;let rid=null;
+  if(sh.charts.length){drawN++;rid='rId1';const anchors=[],drels=[];
+   sh.charts.forEach((c,j)=>{chartN++;files.push([`xl/charts/chart${chartN}.xml`,chartXml(c.ch)]);ct.push(`<Override PartName="/xl/charts/chart${chartN}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`);
+    drels.push(`<Relationship Id="rId${j+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${chartN}.xml"/>`);
+    anchors.push(`<xdr:twoCellAnchor><xdr:from><xdr:col>${c.c}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${c.r}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${c.c2}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${c.r2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${j+2}" name="Chart ${j+1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId${j+1}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`);});
+   files.push([`xl/drawings/drawing${drawN}.xml`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors.join('')}</xdr:wsDr>`]);
+   files.push([`xl/drawings/_rels/drawing${drawN}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${drels.join('')}</Relationships>`]);
+   files.push([`xl/worksheets/_rels/sheet${n}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${drawN}.xml"/></Relationships>`]);
+   ct.push(`<Override PartName="/xl/drawings/drawing${drawN}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);}
+  files.push([`xl/worksheets/sheet${n}.xml`,sh.xml(rid)]);
+  ct.push(`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+  wbRels.push(`<Relationship Id="rId${n}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${n}.xml"/>`);
+  wbSheets.push(`<sheet name="${esc(sh.name)}" sheetId="${n}" r:id="rId${n}"/>`);});
+ const ns=sheets.length;
+ wbRels.push(`<Relationship Id="rId${ns+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`);
+ files.unshift(['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${ct.join('')}</Types>`],
+  ['_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+  ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${wbSheets.join('')}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+  ['xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${wbRels.join('')}</Relationships>`],
+  ['xl/styles.xml',stylesXml]);
+ return zip(files);}
+return {Sheet,build,ST,col,ref,aref,plain};})();
+if(typeof module!=='undefined')module.exports=XL;
+
+</script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const num=v=>{const x=parseFloat(String(v).trim());return isFinite(x)?x:NaN;};
+const OFFICE=['#4472C4','#ED7D31','#A5A5A5','#FFC000','#5B9BD5','#70AD47','#264478','#9E480E','#636363','#997300'];
+const DASHES={solid:'実線',dash:'破線',sysdot:'点線',dashdot:'一点鎖線'};
+const WIDTHS=[0.75,1,1.5,2.25,3];
+const st={series:[],legend:'tr',grid:true,sample:true,auto:{x:true,y:true}};let uid=0;
+
+/* ---------- data ---------- */
+function parseSpectrum(text){const lines=text.split(/\r?\n/);let start=0;const xi=lines.findIndex(l=>/^\s*XYDATA/i.test(l));if(xi>=0)start=xi+1;const pts=[];
+ for(let i=start;i<lines.length;i++){const p=lines[i].trim().split(/[\t,; ]+/);if(p.length<2)continue;const a=parseFloat(p[0]),b=parseFloat(p[1]);if(isFinite(a)&&isFinite(b))pts.push([a,b]);}
+ pts.sort((p,q)=>p[0]-q[0]);return pts;}
+function btbColor(pH){const f=1/(1+10**(7.1-pH));const s=[[0,[214,170,0]],[0.5,[56,150,72]],[1,[33,64,160]]];const [a,b]=f<=0.5?[s[0],s[1]]:[s[1],s[2]];const t=(f-a[0])/(b[0]-a[0]);
+ return '#'+a[1].map((v,i)=>Math.round(v+(b[1][i]-v)*t).toString(16).padStart(2,'0')).join('').toUpperCase();}
+const gauss=(x,m,s)=>Math.exp(-0.5*((x-m)/s)**2);
+function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483647-0.5;};const C=1.2e-5;
+ return [3.85,6.12,6.88,7.35,7.95,10.45].map(pH=>{const fL=1/(1+10**(7.05-pH)),k=1+rnd()*0.008;const d=[];for(let w=350;w<=700;w++){const eH=1.55e4*gauss(w,431,42)+2500*gauss(w,350,25),eL=3.9e4*gauss(w,618,45)+3000*gauss(w,540,25)+5000*gauss(w,398,32)+1500*gauss(w,350,20);d.push([w,+((eH*(1-fL)+eL*fL)*C*k+rnd()*0.002).toFixed(6)]);}
+  return mk({name:'pH '+pH.toFixed(2),file:'サンプル（架空のデータ）',data:d,color:btbColor(pH),isSample:true});});}
+function mk(o){return {id:++uid,dash:'solid',width:1.5,show:true,...o};}
+
+/* ---------- axis helpers ---------- */
+function niceStep(span,n=6){if(!(span>0))return 1;const raw=span/n,mag=10**Math.floor(Math.log10(raw));return [1,2,2.5,5,10].map(k=>k*mag).find(v=>v>=raw*0.999);}
+const decOf=v=>{const s=String(+v.toPrecision(8));const i=s.indexOf('.');return i<0?0:s.length-i-1;};
+const fmtTick=(v,maj)=>{const d=Math.min(6,decOf(maj));const t=Math.abs(v)<maj*1e-6?0:v;return (t<0?'−':'')+Math.abs(t).toFixed(d);};
+function visible(){return st.series.filter(s=>s.show&&s.data.length);}
+function autoX(){const v=visible();if(!v.length)return;const xs=v.flatMap(s=>[s.data[0][0],s.data[s.data.length-1][0]]);setAx({xmin:Math.min(...xs),xmax:Math.max(...xs),xmaj:''});}
+function autoY(){const v=visible();if(!v.length)return;const lo=+$('xmin').value,hi=+$('xmax').value;let mn=Infinity,mx=-Infinity;
+ for(const s of v)for(const [x,y] of s.data){if(isFinite(lo)&&isFinite(hi)&&(x<lo||x>hi))continue;if(y<mn)mn=y;if(y>mx)mx=y;}
+ if(!isFinite(mn))return;const m=niceStep(mx-mn||1);setAx({ymin:+(Math.floor(mn/m+1e-9)*m).toFixed(10),ymax:+(Math.ceil(mx/m-1e-9)*m).toFixed(10),ymaj:''});}
+function setAx(o){for(const k in o)$(k).value=o[k];}
+function axes(){const g=k=>num($(k).value);let xmin=g('xmin'),xmax=g('xmax'),ymin=g('ymin'),ymax=g('ymax');
+ if(!(xmax>xmin)||!(ymax>ymin))return null;let xmaj=g('xmaj'),ymaj=g('ymaj');
+ if(!(xmaj>0)||(xmax-xmin)/xmaj>60)xmaj=niceStep(xmax-xmin);if(!(ymaj>0)||(ymax-ymin)/ymaj>60)ymaj=niceStep(ymax-ymin);
+ return {xmin,xmax,ymin,ymax,xmaj,ymaj,xt:$('xt').value,yt:$('yt').value};}
+
+/* ---------- rich text: *italic*  ^{sup}  _{sub} ---------- */
+const markup=s=>String(s||'').replace(/\*([^*]+)\*/g,'<i>$1</i>');
+function runs(s){const out=[];const re=/(\^\{[^}]*\}|_\{[^}]*\}|<i>.*?<\/i>)/g;let last=0,m;s=markup(s);
+ while((m=re.exec(s))){if(m.index>last)out.push({t:s.slice(last,m.index)});const t=m[0];if(t[0]==='^')out.push({t:t.slice(2,-1),sup:1});else if(t[0]==='_')out.push({t:t.slice(2,-1),sub:1});else out.push({t:t.slice(3,-4),i:1});last=re.lastIndex;}
+ if(last<s.length)out.push({t:s.slice(last)});return out.map(r=>({...r,t:r.t.replace(/-/g,'−')}));}
+const FONT='"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+function rich(g,s,x,y,size,align='center'){const rs=runs(s);const f=r=>`${r.i?'italic ':''}${r.sup||r.sub?size*0.7:size}px ${FONT}`;
+ let w=0;for(const r of rs){g.font=f(r);w+=g.measureText(r.t).width;}let cx=align==='center'?x-w/2:align==='right'?x-w:x;g.textAlign='left';
+ for(const r of rs){g.font=f(r);g.fillText(r.t,cx,y+(r.sup?-size*0.38:r.sub?size*0.22:0));cx+=g.measureText(r.t).width;}return w;}
+
+/* ---------- drawing (white chart, same look as the Excel output) ---------- */
+let W=720,H=480;const PL=74,PR=18,PT=18,PB=60;
+function geom(a){const X=v=>PL+(v-a.xmin)/(a.xmax-a.xmin)*(W-PL-PR),Y=v=>H-PB-(v-a.ymin)/(a.ymax-a.ymin)*(H-PT-PB);
+ const iX=px=>a.xmin+(px-PL)/(W-PL-PR)*(a.xmax-a.xmin),iY=py=>a.ymin+(H-PB-py)/(H-PT-PB)*(a.ymax-a.ymin);return {X,Y,iX,iY};}
+function dashArr(d,w){const u=Math.max(1,w);return d==='dash'?[4*u,3*u]:d==='sysdot'?[u,u]:d==='dashdot'?[4*u,2*u,u,2*u]:[];}
+function legendBox(n){const w=0.22,h=Math.min(0.9,0.052*n+0.03);const p=st.legend;return {x:p[1]==='l'?0.13:0.97-w,y:p[0]==='t'?0.05:0.86-h,w,h};}
+function draw(cv,scale=1,sel){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
+ g.fillStyle='#fff';g.fillRect(0,0,W,H);const a=axes();const v=visible();
+ if(!a||!v.length){g.fillStyle='#5E6F70';g.font=`14px ${FONT}`;g.textAlign='center';g.fillText(v.length?'軸の最小・最大を確認してください（最大 > 最小）':'スペクトルのファイルを読み込むとグラフが表示されます',W/2,H/2);return;}
+ const {X,Y}=geom(a);const t0=k=>a[k+'min']; // Excel starts tick labels at the axis minimum
+ g.lineWidth=1;g.font=`12px ${FONT}`;g.fillStyle='#595959';
+ for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(x,PT);g.lineTo(x,H-PB);g.stroke();}g.textAlign='center';g.fillText(fmtTick(v,a.xmaj),x,H-PB+17);}
+ for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
+ g.strokeStyle='#BFBFBF';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
+ g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-14,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
+ g.save();g.beginPath();g.rect(PL,PT,W-PL-PR,H-PT-PB);g.clip();g.lineJoin='round';g.lineCap='round';
+ for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();let on=false;
+  for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
+ g.restore();g.setLineDash([]);
+ if(st.legend!=='none'){const L=legendBox(v.length);let lx=L.x*W,ly=L.y*H+12;g.font=`12px ${FONT}`;
+  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx,ly-4);g.lineTo(lx+26,ly-4);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly,12,'left');ly+=Math.max(17,0.052*H);}}
+ if(sel){g.fillStyle='rgba(47,93,98,.12)';g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);const x=Math.min(sel[0],sel[2]),y=Math.min(sel[1],sel[3]);g.fillRect(x,y,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.strokeRect(x+.5,y+.5,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.setLineDash([]);}}
+const cv=$('cv');let sel=null;
+function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
+function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),sel);note();}
+
+/* ---------- zoom / pan / readout: mouse = drag-rectangle + wheel, touch = pinch + one-finger sideways pan ---------- */
+const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H];};
+const inPlot=([x,y])=>x>=PL&&x<=W-PR&&y>=PT&&y<=H-PB;
+const rnd=(v,s)=>{const q=10**(Math.floor(Math.log10(s))-1);return +(Math.round(v/q)*q).toPrecision(10);};
+function setRange(xmin,xmax,ymin,ymax){st.auto.x=st.auto.y=false;const xs=xmax-xmin,ys=ymax-ymin;setAx({xmin:rnd(xmin,xs),xmax:rnd(xmax,xs),ymin:rnd(ymin,ys),ymax:rnd(ymax,ys),xmaj:'',ymaj:''});render();}
+function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a.xmin+(a.xmax-a.xmin)*fx,cy=a.ymin+(a.ymax-a.ymin)*fy;
+ setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f);}
+function readout(p){const a=axes(),ro=$('readout');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
+const touches=new Map();let pinch=null,pan=null,lastTap=0;
+function reset(){st.auto.x=st.auto.y=true;render();}
+cv.addEventListener('pointerdown',e=>{const p=toCanvas(e);if(!axes())return;
+ if(e.pointerType==='mouse'){if(!inPlot(p))return;sel=[...p,...p];cv.setPointerCapture(e.pointerId);return;}
+ touches.set(e.pointerId,p);cv.setPointerCapture(e.pointerId);
+ if(touches.size===2){const [q1,q2]=[...touches.values()];pinch={d:Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1,c:[(q1[0]+q2[0])/2,(q1[1]+q2[1])/2],a:axes()};pan=null;}
+ else if(touches.size===1){pan={p,a:axes(),moved:false};readout(p);}});
+cv.addEventListener('pointermove',e=>{const p=toCanvas(e);
+ if(e.pointerType==='mouse'){readout(p);if(sel){sel[2]=Math.min(Math.max(p[0],PL),W-PR);sel[3]=Math.min(Math.max(p[1],PT),H-PB);render();}return;}
+ if(!touches.has(e.pointerId))return;touches.set(e.pointerId,p);
+ if(pinch&&touches.size===2){const [q1,q2]=[...touches.values()];const d=Math.hypot(q1[0]-q2[0],q1[1]-q2[1])||1;
+  zoom(pinch.d/d,(pinch.c[0]-PL)/(W-PL-PR),(H-PB-pinch.c[1])/(H-PT-PB),pinch.a);}
+ else if(pan){const dx=p[0]-pan.p[0];if(Math.abs(dx)>4)pan.moved=true;if(pan.moved){const a=pan.a,s=(a.xmax-a.xmin)/(W-PL-PR)*dx;st.auto.x=false;const xs=a.xmax-a.xmin;setAx({xmin:rnd(a.xmin-s,xs),xmax:rnd(a.xmax-s,xs),xmaj:''});render();}readout(p);}});
+function up(e){if(e.pointerType==='mouse'){if(!sel)return;const s=sel;sel=null;const a=axes();
+  if(a&&Math.abs(s[2]-s[0])>8&&Math.abs(s[3]-s[1])>8){const {iX,iY}=geom(a);const x1=iX(Math.min(s[0],s[2])),x2=iX(Math.max(s[0],s[2])),y1=iY(Math.max(s[1],s[3])),y2=iY(Math.min(s[1],s[3]));
+   const fx=(lo,hi)=>{const m=niceStep(hi-lo);return [+(Math.floor(lo/m+1e-9)*m).toFixed(10),+(Math.ceil(hi/m-1e-9)*m).toFixed(10)];};const [xa,xb]=fx(x1,x2),[ya,yb]=fx(y1,y2);
+   st.auto.x=st.auto.y=false;setAx({xmin:xa,xmax:xb,ymin:ya,ymax:yb,xmaj:'',ymaj:''});}
+  render();return;}
+ const wasTap=pan&&!pan.moved&&touches.size===1;touches.delete(e.pointerId);
+ if(touches.size<2)pinch=null;if(!touches.size)pan=null;
+ if(wasTap&&e.type==='pointerup'){const t=Date.now();if(t-lastTap<320){reset();lastTap=0;}else lastTap=t;}}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('readout').hidden=true;});
+cv.addEventListener('wheel',e=>{const p=toCanvas(e);if(!axes()||!inPlot(p))return;e.preventDefault();zoom(e.deltaY>0?1.25:0.8,(p[0]-PL)/(W-PL-PR),(H-PB-p[1])/(H-PT-PB));},{passive:false});
+$('zin').addEventListener('click',()=>zoom(0.8));$('zout').addEventListener('click',()=>zoom(1.25));
+cv.addEventListener('dblclick',e=>{if(!e.pointerType||e.pointerType==='mouse')reset();});
+if(matchMedia('(pointer: coarse)').matches)$('gesture').textContent='2本指で拡大縮小 · 1本指で左右に移動 · ダブルタップで元に戻す';
+
+/* ---------- series list ---------- */
+function list(){const box=$('series');box.innerHTML='';$('count').textContent=st.series.length?st.series.length+' 本':'';
+ if(!st.series.length){box.innerHTML='<p class="empty">まだファイルがありません。上の枠から読み込んでください（何本でも重ねられます）。</p>';return;}
+ st.series.forEach((s,i)=>{const d=document.createElement('div');d.className='s'+(s.show?'':' off');
+  d.innerHTML=`<input type="checkbox" ${s.show?'checked':''} aria-label="${esc(s.name)}を表示"><input type="color" value="${s.color}" aria-label="${esc(s.name)}の線の色"><input type="text" value="${esc(s.name)}" aria-label="凡例に出る名前"><div class="opts"><select aria-label="線の種類">${Object.entries(DASHES).map(([k,v])=>`<option value="${k}" ${k===s.dash?'selected':''}>${v}</option>`).join('')}</select>
+   <select aria-label="線の太さ">${WIDTHS.map(w=>`<option value="${w}" ${w===s.width?'selected':''}>${w} pt</option>`).join('')}</select></div><div class="moves"><button class="btn icon" type="button" data-a="up" aria-label="上へ" ${i?'':'disabled'}>↑</button><button class="btn icon" type="button" data-a="down" aria-label="下へ" ${i<st.series.length-1?'':'disabled'}>↓</button><button class="btn icon" type="button" data-a="del" aria-label="削除">×</button></div>
+   <span class="file" title="${esc(s.file)}">${esc(s.file)}（${s.data.length} 点）</span>
+   `;
+  box.appendChild(d);const [chk,col,name]=d.querySelectorAll('input');const [dash,wid]=d.querySelectorAll('select');
+  chk.addEventListener('change',()=>{s.show=chk.checked;d.classList.toggle('off',!s.show);touch();render();});
+  col.addEventListener('input',()=>{s.color=col.value.toUpperCase();touch();render();});
+  name.addEventListener('input',()=>{s.name=name.value;touch();render();});
+  dash.addEventListener('change',()=>{s.dash=dash.value;touch();render();});wid.addEventListener('change',()=>{s.width=+wid.value;touch();render();});
+  d.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.a;if(a==='del')st.series.splice(i,1);else{const j=a==='up'?i-1:i+1;[st.series[i],st.series[j]]=[st.series[j],st.series[i]];}touch();list();render();}));});}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function touch(){if(st.sample){st.sample=false;}}
+function note(){$('note').textContent=st.sample?'サンプル（架空のBTBスペクトル6本）を表示中です。自分のファイルを読み込むと置き換わります。':`${visible().length} 本の線を、上のグラフと同じ見た目でExcelのグラフにします（データは「データ」シートに入ります）。`;}
+
+async function load(files){const msg=$('msg');msg.className='msg';msg.textContent='';const bad=[];let added=0;
+ st.series=st.series.filter(s=>!s.isSample);st.sample=false;
+ const sorted=[...files].sort((a,b)=>a.name.localeCompare(b.name,'ja',{numeric:true}));
+ for(const f of sorted){const data=parseSpectrum(await f.text());if(data.length<3){bad.push(f.name);continue;}
+  const base=f.name.replace(/\.[^.]+$/,'');st.series.push(mk({name:base,file:f.name,data,color:OFFICE[st.series.length%OFFICE.length]}));added++;}
+ if(bad.length){msg.className='msg err';msg.textContent=bad.join('、')+' から数値データ（波長と吸光度の2列）を読み取れませんでした。';}
+ if(added){st.auto.x=st.auto.y=true;}list();render();}
+
+/* ---------- export ---------- */
+function workbook(){const a=axes(),v=visible();const {Sheet,ST,aref}=XL;
+ const ds=new Sheet('データ');v.forEach((s,k)=>{const c=k*2;ds.width(c,10).width(c+1,11);ds.set(0,c,XL.plain(markup(s.name)),ST.bold);ds.row(1,c,['x','y'],ST.head);s.data.forEach(([x,y],i)=>{ds.set(2+i,c,x,ST.n2);ds.set(2+i,c+1,y,ST.n6);});});
+ const gs=new Sheet('グラフ');gs.grid=false;for(let c=0;c<12;c++)gs.width(c,10);
+ const ser=v.map((s,k)=>({name:XL.plain(markup(s.name)),x:s.data.map(p=>p[0]),y:s.data.map(p=>p[1]),xRef:aref('データ',2,k*2,1+s.data.length,k*2),yRef:aref('データ',2,k*2+1,1+s.data.length,k*2+1),line:true,width:Math.round(s.width*12700),dash:s.dash,color:s.color.replace('#',''),marker:'none'}));
+ const fm=m=>{const d=decOf(m);return d?'0.'+'0'.repeat(d):'0';};
+ gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:legendBox(v.length)},1,1,22,11);
+ return [gs,ds];}
+async function saveFile(name,blob){const sm=$('save-msg');sm.className='msg';
+ try{if(window.claude&&typeof window.claude.use==='function'){const d=await window.claude.use('downloads');if(d){try{await d.save({filename:name,data:blob});sm.textContent=name+' を保存しました。';}catch(e){sm.className='msg err';sm.textContent=e&&e.code==='declined'?'保存はキャンセルされました。':'保存できませんでした。';}return;}}}catch(_){}
+ const url=URL.createObjectURL(blob);const el=document.createElement('a');el.href=url;el.download=name;document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);sm.textContent=name+' を作成しました。';}
+function ready(){if(!visible().length||!axes()){$('save-msg').className='msg err';$('save-msg').textContent=visible().length?'軸の最小・最大を確認してください。':'表示する線がありません。';return false;}return true;}
+$('xlsx').addEventListener('click',()=>{if(ready())saveFile('スペクトル.xlsx',new Blob([XL.build(workbook())],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));});
+$('png').addEventListener('click',()=>{if(!ready())return;const c=document.createElement('canvas');const keep=[W,H];W=720;H=480;draw(c,3);[W,H]=keep;c.toBlob(b=>saveFile('スペクトル.png',b),'image/png');});
+
+/* ---------- wiring ---------- */
+const drop=$('drop'),inp=$('file');
+drop.addEventListener('click',e=>{if(e.target!==inp)inp.click();});drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();inp.click();}});
+inp.addEventListener('change',()=>{if(inp.files.length)load(inp.files);inp.value='';});
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files.length)load(e.dataTransfer.files);});
+['xt','yt','xmin','xmax','xmaj','ymin','ymax','ymaj'].forEach(k=>$(k).addEventListener('input',()=>{if(/^x(min|max|maj)$/.test(k))st.auto.x=false;if(/^y(min|max|maj)$/.test(k))st.auto.y=false;touch();render();}));
+$('xauto').addEventListener('click',()=>{st.auto.x=true;render();});$('yauto').addEventListener('click',()=>{st.auto.y=true;render();});
+$('grid').addEventListener('change',e=>{st.grid=e.target.checked;render();});
+$('legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.legend=b.dataset.v;$('legend').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));render();}));
+$('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value='';if(!k)return;const n=st.series.length;
+ st.series.forEach((s,i)=>{if(k==='office')s.color=OFFICE[i%OFFICE.length];else if(k==='btb'){const m=s.name.match(/pH\s*([0-9]+(?:\.[0-9]+)?)/i)||s.name.match(/([0-9]+(?:\.[0-9]+)?)/);if(m)s.color=btbColor(+m[1]);}
+  else{const t=n>1?i/(n-1):0;const [c1,c2]=k==='grad'?[[33,64,200],[200,40,40]]:[[0,0,0],[170,170,170]];s.color='#'+c1.map((v,j)=>Math.round(v+(c2[j]-v)*t).toString(16).padStart(2,'0')).join('').toUpperCase();}});
+ if(k==='btb'&&!st.series.some(s=>/[0-9]/.test(s.name))){$('msg').className='msg err';$('msg').textContent='BTBの色は、名前に「pH 7.35」のようにpHの数値があるときに使えます。';}
+ touch();list();render();});
+$('clearall').addEventListener('click',()=>{st.series=[];st.sample=false;$('msg').textContent='';list();render();});
+$('sample').addEventListener('click',()=>{st.series=sample();st.sample=true;setAx({xt:'*λ* / nm',yt:'*A*'});st.auto.x=st.auto.y=true;list();render();});
+window.addEventListener('resize',()=>render());
+st.series=sample();setAx({xt:'*λ* / nm',yt:'*A*'});list();render();
+})();
+
+</script>
+</body></html>

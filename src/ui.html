@@ -1,0 +1,139 @@
+<title>スペクトルグラフメーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* layout: series list (left) + live chart with axis controls (right, sticky), export bar at the bottom */
+:root{
+ --paper:#F6F8F7; --card:#FFFFFF; --ink:#1E2B2C; --muted:#5E6F70; --line:#D5DFDD;
+ --accent:#2F5D62; --accent-ink:#FFFFFF; --soft:#E6EFED; --warn:#9A5B12; --warn-bg:#FBF1E2; --bad:#A63A2E;
+ --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+ --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+ --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
+ --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}}
+:root[data-theme="dark"]{
+ --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
+ --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px;display:grid;gap:20px}
+header{display:grid;gap:6px}
+h1{font-size:clamp(22px,3.2vw,30px);margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 small{font-family:var(--f-mono);font-size:.5em;font-weight:500;color:var(--muted);margin-left:.6em;letter-spacing:.06em}
+.lead{margin:0;color:var(--muted);max-width:72ch}
+.lead a{color:var(--accent)}
+[hidden]{display:none!important}
+.panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px;align-items:start}
+@media (max-width:900px){.panel{grid-template-columns:1fr}}
+.col{display:grid;gap:16px;min-width:0}
+.sticky{position:sticky;top:12px}
+@media (max-width:900px){.sticky{position:static;order:-1}}
+section.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:12px;min-width:0}
+h2{font-size:16px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .tag{font-family:var(--f-mono);font-size:11px;font-weight:500;letter-spacing:.08em;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint code{font-family:var(--f-mono);background:var(--soft);padding:0 4px;border-radius:4px;color:var(--ink)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+@media (max-width:480px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+label.f{display:grid;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
+input[type=number],input[type=text],select{font:inherit;font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0;box-sizing:border-box}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);padding:11px 18px;font-size:15px}
+.btn.small{padding:4px 10px;font-size:13px;font-weight:400}
+.btn.icon{padding:2px 8px;font-size:13px;font-weight:400;line-height:1.4}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer;background:var(--paper)}
+.drop.over{border-color:var(--accent);color:var(--ink)}
+.series{display:grid;gap:8px}
+.s{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:4px 8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--paper)}
+.s.off{opacity:.55}
+.s .file{grid-column:3/-1;grid-row:2;font-family:var(--f-mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s .opts{display:flex;gap:6px}
+.s .opts select{width:auto;padding:5px 6px;font-size:13px}
+@media (max-width:560px){.s{grid-template-columns:auto auto minmax(0,1fr) auto}.s .opts{grid-column:1/-1;grid-row:3}.s .moves{grid-column:4;grid-row:1}}
+.s .moves{display:flex;gap:4px}
+.empty{color:var(--muted);font-size:13px;padding:6px 2px}
+.chartbox{position:relative}
+canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:pan-y;cursor:crosshair}
+.readout{position:absolute;right:10px;bottom:8px;font-family:var(--f-mono);font-size:12px;color:#5E6F70;background:rgba(255,255,255,.85);padding:1px 6px;border-radius:4px;pointer-events:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:var(--card);color:var(--muted);padding:5px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.axis{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.axis h3 .btn[aria-pressed="true"]{background:var(--soft);color:var(--accent);border-color:var(--soft)}
+.axis h3{font-size:13px;margin:0;display:flex;justify-content:space-between;align-items:center}
+.bar{position:sticky;bottom:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.bar p{margin:0;font-size:13px;color:var(--muted);min-width:0;flex:1 1 240px}
+@media (max-width:600px){.bar{position:static}}
+.msg{font-size:13px;margin:0}
+@media (pointer:coarse),(max-width:600px){input[type=number],input[type=text],select{font-size:16px}.btn.icon{padding:6px 12px}.seg button{padding:8px 11px}}
+@media (max-width:600px){.wrap{padding-block:18px 32px}section.box{padding:14px}.panel{gap:14px}.readout{font-size:11px}}
+.msg.err{color:var(--bad)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:no-preference){.btn{transition:border-color .15s}}
+</style>
+
+<div class="wrap">
+<header>
+ <h1>スペクトルグラフメーカー<small>SPECTRA · XLSX / PNG</small></h1>
+ <p class="lead">分光光度計のテキストファイルを何本でも重ねて、線の色・種類・太さ、軸の名前と範囲を自由に決めて、Excelのグラフ（または画像）にします。グラフ上のドラッグやマウスホイール、「拡大」「縮小」ボタンで、表示範囲を自由に変えられます。</p>
+</header>
+
+<div class="panel">
+ <div class="col">
+  <section class="box">
+   <h2>スペクトル<span class="tag" id="count"></span></h2>
+   <div class="drop" id="drop" tabindex="0" role="button">ファイルをドラッグ、またはクリックして選択（複数可・.txt / .csv）<input id="file" type="file" multiple accept=".txt,.TXT,.csv,.CSV" class="sr"></div>
+   <div class="row">
+    <label class="f" style="grid-auto-flow:column;align-items:center;gap:6px">色をまとめて変更
+     <select id="scheme" style="width:auto"><option value="">選ぶ…</option><option value="office">Excel標準の色</option><option value="btb">BTBの色（名前のpHから）</option><option value="grad">青 → 赤のグラデーション</option><option value="gray">黒 → 灰</option></select></label>
+    <button class="btn small" id="clearall" type="button">全部削除</button>
+    <button class="btn small" id="sample" type="button">サンプルに戻す</button>
+   </div>
+   <div class="series" id="series"></div>
+   <p class="msg" id="msg" role="status"></p>
+  </section>
+ </div>
+
+ <div class="col sticky">
+  <section class="box">
+   <div class="row" style="justify-content:space-between"><h2>グラフ<span class="tag" id="gesture">ドラッグ・ホイールで拡大縮小 · ダブルクリックで元に戻す</span></h2><div class="row" style="gap:6px"><button class="btn icon" type="button" id="zin" aria-label="拡大">＋ 拡大</button><button class="btn icon" type="button" id="zout" aria-label="縮小">− 縮小</button></div></div>
+   <div class="chartbox"><canvas id="cv" width="720" height="480" aria-label="スペクトルのグラフのプレビュー"></canvas><span class="readout" id="readout" hidden></span></div>
+   <div class="row" style="justify-content:space-between">
+    <div class="row"><span class="hint">凡例</span><div class="seg" id="legend" role="group" aria-label="凡例の位置">
+     <button type="button" data-v="tr" aria-pressed="true">右上</button><button type="button" data-v="tl" aria-pressed="false">左上</button><button type="button" data-v="br" aria-pressed="false">右下</button><button type="button" data-v="bl" aria-pressed="false">左下</button><button type="button" data-v="none" aria-pressed="false">なし</button></div></div>
+    <label class="row" style="gap:6px;font-size:13px;color:var(--muted)"><input type="checkbox" id="grid" checked>目盛線</label>
+   </div>
+   <div class="axis">
+    <h3>横軸<button class="btn icon" type="button" id="xauto">範囲を自動</button></h3>
+    <label class="f">名前<input type="text" id="xt"></label>
+    <div class="grid3"><label class="f">最小<input type="number" id="xmin" step="any"></label><label class="f">最大<input type="number" id="xmax" step="any"></label><label class="f">目盛の間隔<input type="number" id="xmaj" step="any" placeholder="自動"></label></div>
+   </div>
+   <div class="axis">
+    <h3>縦軸<button class="btn icon" type="button" id="yauto">範囲を自動</button></h3>
+    <label class="f">名前<input type="text" id="yt"></label>
+    <div class="grid3"><label class="f">最小<input type="number" id="ymin" step="any"></label><label class="f">最大<input type="number" id="ymax" step="any"></label><label class="f">目盛の間隔<input type="number" id="ymaj" step="any" placeholder="自動"></label></div>
+   </div>
+   <p class="hint">名前の書き方：<code>*λ*</code> → 斜体、<code>^{-1}</code> → 上付き、<code>_{max}</code> → 下付き（例 <code>*ε* / L mol^{-1} cm^{-1}</code>）</p>
+  </section>
+ </div>
+</div>
+
+<div class="bar">
+ <p id="note"></p>
+ <div class="row"><button class="btn" id="png" type="button">画像（PNG）で保存</button><button class="btn primary" id="xlsx" type="button">Excelファイルを作成</button></div>
+</div>
+<p class="msg" id="save-msg" role="status"></p>
+</div>
+
+<script>
+/*__XLSX__*/
+</script>
+<script>
+/*__APP__*/
+</script>
