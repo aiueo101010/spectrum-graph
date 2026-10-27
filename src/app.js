@@ -4,7 +4,10 @@ const num=v=>{const x=parseFloat(String(v).trim());return isFinite(x)?x:NaN;};
 const OFFICE=['#4472C4','#ED7D31','#A5A5A5','#FFC000','#5B9BD5','#70AD47','#264478','#9E480E','#636363','#997300'];
 const DASHES={solid:'実線',dash:'破線',sysdot:'点線',dashdot:'一点鎖線'};
 const WIDTHS=[0.75,1,1.5,2.25,3];
-const st={series:[],legend:'tr',grid:true,sample:true,auto:{x:true,y:true}};let uid=0;
+const st={series:[],legend:'tr',grid:true,sample:true,auto:{x:true,y:true},look:'office'};
+/* figure look: office (gray text, gridlines) / paper (black frame, ticks out, no gridlines) / mono (black lines told apart by dash) */
+const MONO_D=['solid','dash','sysdot','dashdot'];
+const eff=(s,i)=>st.look==='mono'?{...s,color:'#000000',dash:MONO_D[i%MONO_D.length]}:s;let uid=0;
 
 /* ---------- data ---------- */
 function parseSpectrum(text){const lines=text.split(/\r?\n/);let start=0;const xi=lines.findIndex(l=>/^\s*XYDATA/i.test(l));if(xi>=0)start=xi+1;const pts=[];
@@ -26,7 +29,7 @@ function autoMajor(span){if(!(span>0))return 1;const fits=c=>{const n=span/c;ret
  for(const c of [base/2,base/2.5,base/4,base/5,base/10,base/20].map(c=>+c.toPrecision(6)))if(fits(c)&&span/c<=20)return c;return base;}
 const decOf=v=>{const s=String(+v.toPrecision(8));const i=s.indexOf('.');return i<0?0:s.length-i-1;};
 const fmtTick=(v,maj)=>{const d=Math.min(6,decOf(maj));const t=Math.abs(v)<maj*1e-6?0:v;return (t<0?'−':'')+Math.abs(t).toFixed(d);};
-function visible(){return st.series.filter(s=>s.show&&s.data.length);}
+function visible(){return st.series.filter(s=>s.show&&s.data.length).map((s,i)=>eff(s,i));}
 function autoX(){const v=visible();if(!v.length)return;const xs=v.flatMap(s=>[s.data[0][0],s.data[s.data.length-1][0]]);setAx({xmin:Math.min(...xs),xmax:Math.max(...xs),xmaj:''});}
 function autoY(){const v=visible();if(!v.length)return;const lo=+$('xmin').value,hi=+$('xmax').value;let mn=Infinity,mx=-Infinity;
  for(const s of v)for(const [x,y] of s.data){if(isFinite(lo)&&isFinite(hi)&&(x<lo||x>hi))continue;if(y<mn)mn=y;if(y>mx)mx=y;}
@@ -70,23 +73,34 @@ function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.h
  const {X,Y}=geom(a);
  // at rest ticks start at the axis minimum (that is how Excel draws them); while the graph is being moved they stay fixed to the data so the scale slides with the curves
  const t0=k=>k==='y'&&yMoving?Math.ceil(a.ymin/a.ymaj-1e-9)*a.ymaj:a[k+'min'];
- g.lineWidth=1;g.font=`12px ${FONT}`;g.fillStyle='#595959';
- for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(x,PT);g.lineTo(x,H-PB);g.stroke();}g.textAlign='center';g.fillText(fmtTick(v,a.xmaj),x,H-PB+17);}
- for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
- g.strokeStyle='#BFBFBF';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
- g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-PB+46,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
+ const TXT=st.look==='office'?'#595959':'#000',GRID=st.grid&&st.look!=='paper';
+ g.lineWidth=1;g.font=`12px ${FONT}`;g.fillStyle=TXT;
+ for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;if(GRID){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(x,PT);g.lineTo(x,H-PB);g.stroke();}g.textAlign='center';g.fillText(fmtTick(v,a.xmaj),x,H-PB+17);}
+ for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(GRID){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
+ g.strokeStyle=st.look==='office'?'#BFBFBF':'#000';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
+ if(st.look==='paper'){g.strokeRect(PL+.5,PT+.5,W-PL-PR-1,H-PT-PB-1);g.beginPath();   // framed plot, tick marks pointing out
+  for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;g.moveTo(x,y0);g.lineTo(x,y0+5);}
+  for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;g.moveTo(x0,y);g.lineTo(x0-5,y);}g.stroke();}
+ g.fillStyle=TXT;rich(g,a.xt,PL+(W-PL-PR)/2,H-PB+46,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
  g.save();const cm=Math.max(...v.map(s=>s.width*1.333))/2+1;g.beginPath();g.rect(PL-cm,PT-cm,W-PL-PR+2*cm,H-PT-PB+2*cm);g.clip();   // clip a line-width outside the frame so curves lying on an edge are not cut in half (Excel does not cut them either)
  g.lineJoin='round';g.lineCap='round';
  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.lineCap=s.dash==='solid'?'round':'butt';g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
- if(BL){let y=H-PB+PB0+4+BL.rowH/2;for(const r of BL.rows){let x=PL+(W-PL-PR-r.width)/2;for(const it of r){const s=it.s,lx=x+it.off,lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,y);g.lineTo(lx+26,y);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,y+4,12,'left');}y+=BL.rowH;}}
+ if(BL){let y=H-PB+PB0+4+BL.rowH/2;for(const r of BL.rows){let x=PL+(W-PL-PR-r.width)/2;for(const it of r){const s=it.s,lx=x+it.off,lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,y);g.lineTo(lx+26,y);g.stroke();g.setLineDash([]);g.fillStyle=TXT;rich(g,s.name,lx+32,y+4,12,'left');}y+=BL.rowH;}}
  else if(st.legend!=='none'){const L=legendLayout(g,v);if(live){LG=L;if(drag){g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);g.strokeRect(L.x-2.5,L.y-.5,L.w+3,L.h+1);g.setLineDash([]);}}
-  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}}
+  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle=TXT;rich(g,s.name,lx+32,ly+4,12,'left');});}}
 
 const cv=$('cv');let LG=null,drag=null;
 function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
-function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];LG=null;draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),true);note();}
+/* ---------- remember everything in this browser (restored on the next visit) ---------- */
+const SAVE_KEY='spectrum-graph-v1',AXK=['xt','yt','xmin','xmax','xmaj','ymin','ymax','ymaj'];
+function snapshot(withData=true){const ax={};AXK.forEach(k=>ax[k]=$(k).value);return {v:1,series:withData?st.series.map(({id,...s})=>s):[],legend:st.legend,lpos:st.lpos,grid:st.grid,look:st.look,auto:st.auto,sample:st.sample,ax};}
+let saveT=0;function saveSoon(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(SAVE_KEY,JSON.stringify(snapshot(true)));}catch(_){try{localStorage.setItem(SAVE_KEY,JSON.stringify(snapshot(false)));}catch(__){}}},500);}
+function restore(){let s=null;try{s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');}catch(_){}if(!s||s.v!==1)return false;
+ try{st.series=(s.series||[]).map(x=>mk(x));Object.assign(st,{legend:s.legend||'tr',lpos:s.lpos,grid:s.grid!==false,look:s.look||'office',auto:s.auto||{x:true,y:true},sample:!!s.sample});AXK.forEach(k=>{if(s.ax&&s.ax[k]!=null)$(k).value=s.ax[k];});
+  $('grid').checked=st.grid;$('look').value=st.look;legendButtons();return true;}catch(_){return false;}}
+function render(){if(st.auto.x)autoX();if(st.auto.y)autoY();autoUI();const cw=cv.clientWidth||720;[W,H]=cw<560?[460,340]:[720,480];LG=null;draw(cv,Math.max(1,Math.min(3,cw/W*(window.devicePixelRatio||1))),true);note();saveSoon();}
 
 /* ---------- drag: legend → move legend, plot area → move the y range up/down (mouse & touch) ---------- */
 const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H];};
@@ -153,7 +167,7 @@ function workbook(){const a=axes(),v=visible();const {Sheet,ST,aref}=XL;
  const gs=new Sheet('グラフ');gs.grid=false;for(let c=0;c<12;c++)gs.width(c,10);
  const ser=v.map((s,k)=>({name:XL.plain(markup(s.name)),x:s.data.map(p=>p[0]),y:s.data.map(p=>p[1]),xRef:aref('データ',2,k*2,1+s.data.length,k*2),yRef:aref('データ',2,k*2+1,1+s.data.length,k*2+1),line:true,width:Math.round(s.width*12700),dash:s.dash,color:s.color.replace('#',''),marker:'none'}));
  const fm=m=>{const d=decOf(m);return d?'0.'+'0'.repeat(d):'0';};
- gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:st.legend==='bottom'?{pos:'b'}:excelLegend(v)},1,1,22,11);
+ gs.chart({look:st.look,series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:st.legend==='bottom'?{pos:'b'}:excelLegend(v)},1,1,22,11);
  return [gs,ds];}
 async function saveFile(name,blob){const sm=$('save-msg');sm.className='msg';
  try{if(window.claude&&typeof window.claude.use==='function'){const d=await window.claude.use('downloads');if(d){try{await d.save({filename:name,data:blob});sm.textContent=name+' を保存しました。';}catch(e){sm.className='msg err';sm.textContent=e&&e.code==='declined'?'保存はキャンセルされました。':'保存できませんでした。';}return;}}}catch(_){}
@@ -171,6 +185,7 @@ drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over'
 ['xt','yt','xmin','xmax','xmaj','ymin','ymax','ymaj'].forEach(k=>$(k).addEventListener('input',()=>{if(/^x(min|max|maj)$/.test(k))st.auto.x=false;if(/^y(min|max|maj)$/.test(k))st.auto.y=false;touch();render();}));
 $('xauto').addEventListener('click',()=>{st.auto.x=true;render();});$('yauto').addEventListener('click',()=>{st.auto.y=true;render();});
 $('grid').addEventListener('change',e=>{st.grid=e.target.checked;render();});
+$('look').addEventListener('change',e=>{st.look=e.target.value;render();});
 $('legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{st.legend=b.dataset.v;legendButtons();render();}));
 $('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value='';if(!k)return;const miss=[];const n=st.series.length;
  st.series.forEach((s,i)=>{if(k==='office')s.color=OFFICE[i%OFFICE.length];else if(k==='btb'){const m=s.name.match(/pH\s*([0-9]+(?:\.[0-9]+)?)/i);if(m)s.color=btbColor(+m[1]);else miss.push(s.name||'（名前なし）');}
@@ -180,5 +195,5 @@ $('scheme').addEventListener('change',e=>{const k=e.target.value;e.target.value=
 $('clearall').addEventListener('click',()=>{st.series=[];st.sample=false;$('msg').textContent='';list();render();});
 $('sample').addEventListener('click',()=>{st.series=sample();st.sample=true;setAx({xt:'*λ* / nm',yt:'*A*'});st.auto.x=st.auto.y=true;list();render();});
 window.addEventListener('resize',()=>render());
-st.series=sample();setAx({xt:'*λ* / nm',yt:'*A*'});list();render();
+if(!restore()){st.series=sample();setAx({xt:'*λ* / nm',yt:'*A*'});}list();render();
 })();

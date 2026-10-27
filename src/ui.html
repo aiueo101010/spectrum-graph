@@ -117,7 +117,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
    <div class="row" style="justify-content:space-between">
     <div class="row"><span class="hint">凡例</span><div class="seg" id="legend" role="group" aria-label="凡例の位置">
      <button type="button" data-v="tr" aria-pressed="true">右上</button><button type="button" data-v="tl" aria-pressed="false">左上</button><button type="button" data-v="br" aria-pressed="false">右下</button><button type="button" data-v="bl" aria-pressed="false">左下</button><button type="button" data-v="bottom" aria-pressed="false" title="グラフの下に横並び">下段</button><button type="button" data-v="none" aria-pressed="false">なし</button></div></div>
-    <label class="row" style="gap:6px;font-size:13px;color:var(--muted)"><input type="checkbox" id="grid" checked>目盛線</label>
+    <div class="row" style="gap:14px"><label class="row" style="gap:6px;font-size:13px;color:var(--muted)">図の見た目<select id="look" style="width:auto"><option value="office">標準（Excel風）</option><option value="paper">論文風（枠と目盛）</option><option value="mono">白黒（線種で区別）</option></select></label><label class="row" style="gap:6px;font-size:13px;color:var(--muted)"><input type="checkbox" id="grid" checked>目盛線</label></div>
    </div>
    <div class="axis">
     <h3>横軸<button class="btn icon" type="button" id="xauto">範囲を自動</button></h3>
@@ -139,6 +139,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
  <div class="row"><button class="btn" id="png" type="button">画像（PNG）で保存</button><button class="btn primary" id="xlsx" type="button">Excelファイルを作成</button></div>
 </div>
 <p class="msg" id="save-msg" role="status"></p>
+<p class="hint">読み込んだスペクトル・線や軸の設定・図の見た目は、このブラウザに自動で保存され、次に開いたときに元に戻ります（ほかの人や別の端末には共有されません）。消したいときは「全部削除」を押してください。</p>
 </div>
 
 <script>
