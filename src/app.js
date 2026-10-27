@@ -93,13 +93,6 @@ const toCanvas=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)
 const inPlot=([x,y])=>x>=PL&&x<=W-PR&&y>=PT&&y<=H-PB;
 const onLegend=([x,y])=>LG&&x>=LG.x-6&&x<=LG.x+LG.w+6&&y>=LG.y-6&&y<=LG.y+LG.h+6;
 const rnd=(v,s)=>{const q=10**(Math.floor(Math.log10(s))-1);return +(Math.round(v/q)*q).toPrecision(10);};
-// zoom result is put on whole ticks so the axis labels start on a gridline (same in the preview and in Excel)
-function setRange(xmin,xmax,ymin,ymax,dir=0){st.auto.x=st.auto.y=false;const cur=axes();
- const fit=(lo,hi,k)=>{const man=num($(k+'maj').value);const m=man>0&&(hi-lo)/man<=60?man:niceStep(hi-lo);let a1=Math.round(lo/m)*m,a2=Math.round(hi/m)*m;
-  if(cur&&dir&&Math.abs(a1-cur[k+'min'])<m*1e-6&&Math.abs(a2-cur[k+'max'])<m*1e-6){a1-=dir*m;a2+=dir*m;}if(a2-a1<m){a1=Math.floor(lo/m)*m;a2=a1+m;}return [+a1.toFixed(10),+a2.toFixed(10)];};
- const [x1,x2]=fit(xmin,xmax,'x'),[y1,y2]=fit(ymin,ymax,'y');setAx({xmin:x1,xmax:x2,ymin:y1,ymax:y2});render();}
-function zoom(f,fx=0.5,fy=0.5,base){const a=base||axes();if(!a)return;const cx=a.xmin+(a.xmax-a.xmin)*fx,cy=a.ymin+(a.ymax-a.ymin)*fy;
- setRange(cx-(cx-a.xmin)*f,cx+(a.xmax-cx)*f,cy-(cy-a.ymin)*f,cy+(a.ymax-cy)*f,f<1?-1:1);}
 let roTimer=0;
 // mouse: follows the pointer. touch: appears while the finger is down, stays ~3 s after lifting, then fades out
 function readout(p){const a=axes(),ro=$('readout');clearTimeout(roTimer);ro.classList.remove('fade');if(a&&inPlot(p)){const {iX,iY}=geom(a);ro.hidden=false;ro.textContent=`x = ${iX(p[0]).toFixed(decOf(a.xmaj)+1)},  y = ${iY(p[1]).toFixed(decOf(a.ymaj)+2)}`;}else ro.hidden=true;}
@@ -124,7 +117,6 @@ function snapY(){const a=axes();if(!a){yMoving=false;render();return;}const span
  snapAnim=requestAnimationFrame(step);}
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
 cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')$('readout').hidden=true;});
-$('zin').addEventListener('click',()=>zoom(0.8));$('zout').addEventListener('click',()=>zoom(1.25));
 $('gesture').textContent='グラフをドラッグで上下に移動 · 凡例はドラッグで移動';
 
 /* ---------- series list ---------- */

@@ -86,7 +86,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
 <div class="wrap">
 <header>
  <h1>スペクトルグラフメーカー<small>SPECTRA · XLSX / PNG</small></h1>
- <p class="lead">分光光度計のテキストファイルを何本でも重ねて、線の色・種類・太さ、軸の名前と範囲を自由に決めて、Excelのグラフ（または画像）にします。グラフはドラッグで上下に動かせ、「拡大」「縮小」ボタンや軸の数値でも範囲を変えられます。凡例はドラッグで好きな位置に動かせます。</p>
+ <p class="lead">分光光度計のテキストファイルを何本でも重ねて、線の色・種類・太さ、軸の名前と範囲を自由に決めて、Excelのグラフ（または画像）にします。グラフはドラッグで上下に動かせ、軸の数値で範囲を変えられます。凡例はドラッグで好きな位置に動かせます。</p>
 </header>
 
 <div class="panel">
@@ -109,7 +109,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
 
  <div class="col sticky">
   <section class="box">
-   <div class="row" style="justify-content:space-between"><h2>グラフ<span class="tag" id="gesture">グラフをドラッグで上下に移動 · 凡例はドラッグで移動</span></h2><div class="row" style="gap:6px"><button class="btn icon" type="button" id="zin" aria-label="拡大">＋ 拡大</button><button class="btn icon" type="button" id="zout" aria-label="縮小">− 縮小</button></div></div>
+   <div class="row" style="justify-content:space-between"><h2>グラフ<span class="tag" id="gesture">グラフをドラッグで上下に移動 · 凡例はドラッグで移動</span></h2></div>
    <div class="chartbox"><canvas id="cv" width="720" height="480" aria-label="スペクトルのグラフのプレビュー"></canvas><span class="readout" id="readout" hidden></span></div>
    <div class="row" style="justify-content:space-between">
     <div class="row"><span class="hint">凡例</span><div class="seg" id="legend" role="group" aria-label="凡例の位置">
