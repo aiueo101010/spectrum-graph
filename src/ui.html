@@ -21,6 +21,8 @@ header{display:grid;gap:6px}
 h1{font-size:clamp(22px,3.2vw,30px);margin:0;letter-spacing:.02em;text-wrap:balance}
 h1 small{font-family:var(--f-mono);font-size:.5em;font-weight:500;color:var(--muted);margin-left:.6em;letter-spacing:.06em}
 .lead{margin:0;color:var(--muted);max-width:72ch}
+.pcnote{margin:4px 0 0;font-size:13px;color:var(--ink);background:var(--soft);border-radius:8px;padding:6px 12px;max-width:600px;box-sizing:border-box}
+.pcnote b{color:var(--accent)}
 .lead a{color:var(--accent)}
 [hidden]{display:none!important}
 .panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px;align-items:start}
@@ -87,6 +89,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
 <header>
  <h1>スペクトルグラフメーカー<small>SPECTRA · XLSX / PNG</small></h1>
  <p class="lead">分光光度計のテキストファイルを何本でも重ねて、線の色・種類・太さ、軸の名前と範囲を自由に決めて、Excelのグラフ（または画像）にします。グラフはドラッグで上下に動かせ、軸の数値で範囲を変えられます。凡例はドラッグで好きな位置に動かせます。</p>
+ <p class="pcnote">💻 <b>パソコンでの利用をおすすめします。</b>グラフと線・軸の設定を横に並べて見ながら作業できるレイアウトです。スマホでも使えますが、画面が狭いため上下に長くなります。</p>
 </header>
 
 <div class="panel">
