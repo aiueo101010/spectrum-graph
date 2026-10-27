@@ -44,7 +44,7 @@ function rich(g,s,x,y,size,align='center'){const rs=runs(s);const f=r=>`${r.i?'i
  for(const r of rs){g.font=f(r);g.fillText(r.t,cx,y+(r.sup?-size*0.38:r.sub?size*0.22:0));cx+=g.measureText(r.t).width;}return w;}
 
 /* ---------- drawing (white chart, same look as the Excel output) ---------- */
-let W=720,H=480;const PL=74,PR=18,PT=18,PB=60;
+let W=720,H=480,PB=60;const PL=74,PR=18,PT=18,PB0=60;
 function geom(a){const X=v=>PL+(v-a.xmin)/(a.xmax-a.xmin)*(W-PL-PR),Y=v=>H-PB-(v-a.ymin)/(a.ymax-a.ymin)*(H-PT-PB);
  const iX=px=>a.xmin+(px-PL)/(W-PL-PR)*(a.xmax-a.xmin),iY=py=>a.ymin+(H-PB-py)/(H-PT-PB)*(a.ymax-a.ymin);return {X,Y,iX,iY};}
 function dashArr(d,w){const u=Math.max(d==='sysdot'?2:1,w);return d==='dash'?[4*u,3*u]:d==='sysdot'?[u,u]:d==='dashdot'?[4*u,2*u,u,2*u]:[];}
@@ -55,8 +55,13 @@ function legendLayout(g,v){const rowH=18,pad=6,key=32;const tw=Math.max(...v.map
  const w=cols*colW,h=Math.min(v.length,rows)*rowH+pad*2;const p=st.legend;let x,y;
  if(p==='custom'){x=PL+st.lpos.fx*Math.max(0,W-PL-PR-w);y=PT+st.lpos.fy*Math.max(0,H-PT-PB-h);}   // dragged: stored as a share of the free space, so it stays inside at any size
  else{x=p[1]==='l'?PL+8:W-PR-8-w;y=p[0]==='t'?PT+4:H-PB-4-h;}return {x,y,w,h,rows,colW,rowH,pad};}
+/* legend under the graph: items side by side, wrapping onto more rows when needed */
+function bottomLayout(g,v){const rowH=18,gap=18,key=32,maxW=W-PL-PR;const rows=[[]];let cw=0;
+ for(const s of v){const w=key+measureRich(g,s.name,12);if(rows[rows.length-1].length&&cw+gap+w>maxW){rows.push([]);cw=0;}const r=rows[rows.length-1];if(r.length)cw+=gap;r.push({s,w,off:cw});cw+=w;r.width=cw;}
+ return {rows,rowH,h:rows.length*rowH};}
 function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
  g.fillStyle='#fff';g.fillRect(0,0,W,H);const a=axes();const v=visible();
+ const BL=st.legend==='bottom'&&v.length?bottomLayout(g,v):null;PB=PB0+(BL?BL.h+8:0);
  if(!a||!v.length){g.fillStyle='#5E6F70';g.font=`14px ${FONT}`;g.textAlign='center';g.fillText(v.length?'軸の最小・最大を確認してください（最大 > 最小）':'スペクトルのファイルを読み込むとグラフが表示されます',W/2,H/2);return;}
  const {X,Y}=geom(a);
  // at rest ticks start at the axis minimum (that is how Excel draws them); while the graph is being moved they stay fixed to the data so the scale slides with the curves
@@ -65,12 +70,13 @@ function draw(cv,scale=1,live){const g=cv.getContext('2d');cv.width=W*scale;cv.h
  for(let k=0,v=t0('x');v<=a.xmax+a.xmaj*1e-6&&k<200;k++,v=t0('x')+k*a.xmaj){const x=Math.round(X(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(x,PT);g.lineTo(x,H-PB);g.stroke();}g.textAlign='center';g.fillText(fmtTick(v,a.xmaj),x,H-PB+17);}
  for(let k=0,v=t0('y');v<=a.ymax+a.ymaj*1e-6&&k<200;k++,v=t0('y')+k*a.ymaj){const y=Math.round(Y(v))+.5;if(st.grid){g.strokeStyle='#D9D9D9';g.beginPath();g.moveTo(PL,y);g.lineTo(W-PR,y);g.stroke();}g.textAlign='right';g.fillText(fmtTick(v,a.ymaj),PL-7,y+4);}
  g.strokeStyle='#BFBFBF';g.beginPath();const y0=Math.round(Y(Math.min(Math.max(0,a.ymin),a.ymax)))+.5;g.moveTo(PL,y0);g.lineTo(W-PR,y0);const x0=Math.round(X(Math.min(Math.max(0,a.xmin),a.xmax)))+.5;g.moveTo(x0,PT);g.lineTo(x0,H-PB);g.stroke();
- g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-14,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
+ g.fillStyle='#595959';rich(g,a.xt,PL+(W-PL-PR)/2,H-PB+46,13);g.save();g.translate(20,PT+(H-PT-PB)/2);g.rotate(-Math.PI/2);rich(g,a.yt,0,0,13);g.restore();
  g.save();g.beginPath();g.rect(PL,PT,W-PL-PR,H-PT-PB);g.clip();g.lineJoin='round';g.lineCap='round';
  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.lineCap=s.dash==='solid'?'round':'butt';g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
- if(st.legend!=='none'){const L=legendLayout(g,v);if(live){LG=L;if(drag){g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);g.strokeRect(L.x-2.5,L.y-.5,L.w+3,L.h+1);g.setLineDash([]);}}
+ if(BL){let y=H-PB+PB0+4+BL.rowH/2;for(const r of BL.rows){let x=PL+(W-PL-PR-r.width)/2;for(const it of r){const s=it.s,lx=x+it.off,lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,y);g.lineTo(lx+26,y);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,y+4,12,'left');}y+=BL.rowH;}}
+ else if(st.legend!=='none'){const L=legendLayout(g,v);if(live){LG=L;if(drag){g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);g.strokeRect(L.x-2.5,L.y-.5,L.w+3,L.h+1);g.setLineDash([]);}}
   v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.lineCap='butt';g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}}
 
 const cv=$('cv');let LG=null,drag=null;
@@ -147,7 +153,7 @@ function workbook(){const a=axes(),v=visible();const {Sheet,ST,aref}=XL;
  const gs=new Sheet('グラフ');gs.grid=false;for(let c=0;c<12;c++)gs.width(c,10);
  const ser=v.map((s,k)=>({name:XL.plain(markup(s.name)),x:s.data.map(p=>p[0]),y:s.data.map(p=>p[1]),xRef:aref('データ',2,k*2,1+s.data.length,k*2),yRef:aref('データ',2,k*2+1,1+s.data.length,k*2+1),line:true,width:Math.round(s.width*12700),dash:s.dash,color:s.color.replace('#',''),marker:'none'}));
  const fm=m=>{const d=decOf(m);return d?'0.'+'0'.repeat(d):'0';};
- gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:excelLegend(v)},1,1,22,11);
+ gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:st.legend==='bottom'?{pos:'b'}:excelLegend(v)},1,1,22,11);
  return [gs,ds];}
 async function saveFile(name,blob){const sm=$('save-msg');sm.className='msg';
  try{if(window.claude&&typeof window.claude.use==='function'){const d=await window.claude.use('downloads');if(d){try{await d.save({filename:name,data:blob});sm.textContent=name+' を保存しました。';}catch(e){sm.className='msg err';sm.textContent=e&&e.code==='declined'?'保存はキャンセルされました。':'保存できませんでした。';}return;}}}catch(_){}
