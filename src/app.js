@@ -48,7 +48,12 @@ let W=720,H=480;const PL=74,PR=18,PT=18,PB=60;
 function geom(a){const X=v=>PL+(v-a.xmin)/(a.xmax-a.xmin)*(W-PL-PR),Y=v=>H-PB-(v-a.ymin)/(a.ymax-a.ymin)*(H-PT-PB);
  const iX=px=>a.xmin+(px-PL)/(W-PL-PR)*(a.xmax-a.xmin),iY=py=>a.ymin+(H-PB-py)/(H-PT-PB)*(a.ymax-a.ymin);return {X,Y,iX,iY};}
 function dashArr(d,w){const u=Math.max(1,w);return d==='dash'?[4*u,3*u]:d==='sysdot'?[u,u]:d==='dashdot'?[4*u,2*u,u,2*u]:[];}
-function legendBox(n){const w=0.22,h=Math.min(0.9,0.052*n+0.03);const p=st.legend;return {x:p[1]==='l'?0.13:0.97-w,y:p[0]==='t'?0.05:0.86-h,w,h};}
+function measureRich(g,s,size){let w=0;for(const r of runs(s)){g.font=`${r.i?'italic ':''}${r.sup||r.sub?size*0.7:size}px ${FONT}`;w+=g.measureText(r.t).width;}return w;}
+/* legend placed inside the plot area, sized to its text; splits into columns when it would not fit vertically */
+function legendLayout(g,v){const rowH=18,pad=6,key=32;const tw=Math.max(...v.map(s=>measureRich(g,s.name,12)));const colW=key+tw+10;
+ const avail=H-PT-PB-16;const maxRows=Math.max(1,Math.min(v.length,Math.floor((avail-pad*2)/rowH)));const cols=Math.ceil(v.length/maxRows),rows=Math.ceil(v.length/cols);
+ const w=cols*colW,h=Math.min(v.length,rows)*rowH+pad*2;const p=st.legend;
+ const x=p[1]==='l'?PL+8:W-PR-8-w,y=p[0]==='t'?PT+4:H-PB-4-h;return {x,y,w,h,rows,colW,rowH,pad};}
 function draw(cv,scale=1,sel){const g=cv.getContext('2d');cv.width=W*scale;cv.height=H*scale;g.setTransform(scale,0,0,scale,0,0);
  g.fillStyle='#fff';g.fillRect(0,0,W,H);const a=axes();const v=visible();
  if(!a||!v.length){g.fillStyle='#5E6F70';g.font=`14px ${FONT}`;g.textAlign='center';g.fillText(v.length?'軸の最小・最大を確認してください（最大 > 最小）':'スペクトルのファイルを読み込むとグラフが表示されます',W/2,H/2);return;}
@@ -62,8 +67,8 @@ function draw(cv,scale=1,sel){const g=cv.getContext('2d');cv.width=W*scale;cv.he
  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();let on=false;
   for(const [x,y] of s.data){if(!isFinite(y)){on=false;continue;}const px=X(x),py=Y(y);if(!on){g.moveTo(px,py);on=true;}else g.lineTo(px,py);}g.stroke();}
  g.restore();g.setLineDash([]);
- if(st.legend!=='none'){const L=legendBox(v.length);let lx=L.x*W,ly=L.y*H+12;g.font=`12px ${FONT}`;
-  for(const s of v){const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx,ly-4);g.lineTo(lx+26,ly-4);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly,12,'left');ly+=Math.max(17,0.052*H);}}
+ if(st.legend!=='none'){const L=legendLayout(g,v);
+  v.forEach((s,i)=>{const lx=L.x+Math.floor(i/L.rows)*L.colW,ly=L.y+L.pad+(i%L.rows)*L.rowH+L.rowH/2;const lw=s.width*1.333;g.strokeStyle=s.color;g.lineWidth=lw;g.setLineDash(dashArr(s.dash,lw));g.beginPath();g.moveTo(lx+2,ly);g.lineTo(lx+26,ly);g.stroke();g.setLineDash([]);g.fillStyle='#595959';rich(g,s.name,lx+32,ly+4,12,'left');});}
  if(sel){g.fillStyle='rgba(47,93,98,.12)';g.strokeStyle='#2F5D62';g.lineWidth=1;g.setLineDash([4,3]);const x=Math.min(sel[0],sel[2]),y=Math.min(sel[1],sel[3]);g.fillRect(x,y,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.strokeRect(x+.5,y+.5,Math.abs(sel[2]-sel[0]),Math.abs(sel[3]-sel[1]));g.setLineDash([]);}}
 const cv=$('cv');let sel=null;
 function autoUI(){for(const k of ['x','y']){const b=$(k+'auto');b.setAttribute('aria-pressed',st.auto[k]?'true':'false');b.textContent=st.auto[k]?'自動（データに合わせる）':'自動に戻す';}}
@@ -132,12 +137,14 @@ async function load(files){const msg=$('msg');msg.className='msg';msg.textConten
  if(added){st.auto.x=st.auto.y=true;}list();render();}
 
 /* ---------- export ---------- */
+function excelLegend(v){const keep=[W,H];W=720;H=480;const g=document.createElement('canvas').getContext('2d');const L=legendLayout(g,v);[W,H]=keep;const sw=1.12;
+ return {x:L.x/720,y:L.y/480,w:Math.min(0.85,L.w*sw/720),h:Math.min(0.85,L.h/480)};}
 function workbook(){const a=axes(),v=visible();const {Sheet,ST,aref}=XL;
  const ds=new Sheet('データ');v.forEach((s,k)=>{const c=k*2;ds.width(c,10).width(c+1,11);ds.set(0,c,XL.plain(markup(s.name)),ST.bold);ds.row(1,c,['x','y'],ST.head);s.data.forEach(([x,y],i)=>{ds.set(2+i,c,x,ST.n2);ds.set(2+i,c+1,y,ST.n6);});});
  const gs=new Sheet('グラフ');gs.grid=false;for(let c=0;c<12;c++)gs.width(c,10);
  const ser=v.map((s,k)=>({name:XL.plain(markup(s.name)),x:s.data.map(p=>p[0]),y:s.data.map(p=>p[1]),xRef:aref('データ',2,k*2,1+s.data.length,k*2),yRef:aref('データ',2,k*2+1,1+s.data.length,k*2+1),line:true,width:Math.round(s.width*12700),dash:s.dash,color:s.color.replace('#',''),marker:'none'}));
  const fm=m=>{const d=decOf(m);return d?'0.'+'0'.repeat(d):'0';};
- gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:legendBox(v.length)},1,1,22,11);
+ gs.chart({series:ser,x:{title:markup(a.xt),min:a.xmin,max:a.xmax,major:a.xmaj,fmt:fm(a.xmaj),grid:st.grid},y:{title:markup(a.yt),min:a.ymin,max:a.ymax,major:a.ymaj,fmt:fm(a.ymaj),grid:st.grid},legend:st.legend==='none'?false:excelLegend(v)},1,1,22,11);
  return [gs,ds];}
 async function saveFile(name,blob){const sm=$('save-msg');sm.className='msg';
  try{if(window.claude&&typeof window.claude.use==='function'){const d=await window.claude.use('downloads');if(d){try{await d.save({filename:name,data:blob});sm.textContent=name+' を保存しました。';}catch(e){sm.className='msg err';sm.textContent=e&&e.code==='declined'?'保存はキャンセルされました。':'保存できませんでした。';}return;}}}catch(_){}
