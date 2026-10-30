@@ -1,6 +1,6 @@
 <title>スペクトルグラフメーカー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+Mono:wght@400&display=swap">
 <style>
 /* layout: series list (left) + live chart with axis controls (right, sticky), export bar at the bottom */
 :root{
@@ -9,12 +9,6 @@
  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
- --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
- --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}}
-:root[data-theme="dark"]{
- --paper:#141B1C; --card:#1B2425; --ink:#E4ECEA; --muted:#9DB0AE; --line:#2E3B3C;
- --accent:#7FB8B0; --accent-ink:#0F1718; --soft:#22302F; --warn:#E3B66E; --warn-bg:#2E2618; --bad:#F08A7D; color-scheme:dark}
 body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.65;margin:0}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px;display:grid;gap:20px}
 header{display:grid;gap:6px}
@@ -83,6 +77,7 @@ canvas{width:100%;height:auto;display:block;background:#fff;border:1px solid var
 .msg.err{color:var(--bad)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:no-preference){.btn{transition:border-color .15s}}
+/*__DADS__*/
 </style>
 
 <div class="wrap">
